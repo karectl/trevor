@@ -1,0 +1,76 @@
+# Default values for trevor.
+
+replicaCount: 1
+
+image:
+  repository: trevor
+  pullPolicy: IfNotPresent
+  tag: ""  # defaults to .Chart.AppVersion
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: trevor.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+# ── Application config ───────────────────────────────────────────────────────
+env:
+  LOG_LEVEL: "INFO"
+  DEV_AUTH_BYPASS: "false"
+
+# Override DATABASE_URL, REDIS_URL, Keycloak, S3 creds via Kubernetes Secrets.
+# Mount secret keys as env vars in your overlay values.
+envFromSecrets: []
+# - secretName: trevor-db
+#   keys: [DATABASE_URL]
+# - secretName: trevor-s3
+#   keys: [S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY]
+
+# ── ARQ worker ────────────────────────────────────────────────────────────────
+worker:
+  enabled: true
+  replicaCount: 1
+  command: ["uv", "run", "arq", "trevor.worker.WorkerSettings"]
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ── Redis (sub-chart placeholder) ─────────────────────────────────────────────
+redis:
+  enabled: false  # use an external Redis in prod; enable for local testing
+
+# ── PostgreSQL (sub-chart placeholder) ────────────────────────────────────────
+postgresql:
+  enabled: false  # use an external PG in prod; enable for local testing

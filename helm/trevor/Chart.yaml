@@ -1,0 +1,13 @@
+apiVersion: v2
+name: trevor
+description: Airlock manager for the KARECTL Trusted Research Environment
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - airlock
+  - tre
+  - karectl
+maintainers:
+  - name: vvcb
+    email: vvcb.n1@gmail.com
