@@ -2,8 +2,6 @@
 
 Egress/airlock microservice for the KARECTL Trusted Research Environment (TRE). Manages controlled import/export of research outputs across the TRE security boundary.
 
-**Status**: Iteration 0 skeleton — only FastAPI dep and a stub `main()` exist. All tooling (ruff, pre-commit, Alembic, tests, CI, Helm, Tiltfile) is planned but not yet configured.
-
 ---
 
 ## Toolchain
@@ -13,26 +11,24 @@ Egress/airlock microservice for the KARECTL Trusted Research Environment (TRE). 
 | Python | 3.13 (pinned in `.python-version`) |
 | Package manager | `uv` 0.11.2 |
 | Build backend | `uv_build` |
+| Linting/formatting | `ruff` (config in `pyproject.toml`) |
+| Pre-commit | `prek` (config in `pyproject.toml [tool.prek]`) |
+| Tests | `pytest` + `pytest-asyncio` (async mode auto) |
 
 All commands go through `uv`:
 
 ```bash
 uv sync                          # install / sync deps into .venv
-uv run trevor                    # run entry point (trevor:main in src/trevor/__init__.py)
-uv add <package>                 # add a dependency
-uv run ruff check .              # lint (not yet configured)
-uv run ruff format .             # format (not yet configured)
-uv run pytest                    # tests (not yet configured)
-uv run alembic upgrade head      # migrations (not yet configured)
+uv run trevor                    # run app (uvicorn on :8000)
+uv run pytest -v                 # run tests
+uv run ruff check .              # lint
+uv run ruff format .             # format
+uv run alembic upgrade head      # run migrations
+uv run alembic revision --autogenerate -m "description"  # generate migration
+uv run arq trevor.worker.WorkerSettings  # run ARQ worker
 ```
 
-No `make`, `just`, `task`, or `.pre-commit-config.yaml` exist yet.
-
----
-
-## Lockfile discrepancy
-
-`pyproject.toml` depends on `fastapi>=0.125.0` and `spec/CONSTRAINTS.md` mandates **Pydantic v2**, but `uv.lock` currently resolves to **Pydantic 1.10.26**. The lock needs to be updated before implementing any models.
+No `make`, `just`, or `task` — `uv run` only.
 
 ---
 
@@ -43,35 +39,77 @@ No `make`, `just`, `task`, or `.pre-commit-config.yaml` exist yet.
 | Backend | FastAPI |
 | Validation | Pydantic v2 |
 | ORM | SQLModel |
-| Migrations | Alembic |
-| Async DB sessions | `AsyncSession` / `async_sessionmaker` (`aiosqlite` locally, `asyncpg` in prod) |
+| Migrations | Alembic (async template, `aiosqlite` locally, `asyncpg` in prod) |
 | Linting/formatting | `ruff` |
 | Pre-commit | `prek` |
-| Frontend | **Datastar** (hypermedia + SSE; no JS build step; ~14 KB script — not htmx, not React) |
+| Frontend | **Datastar** (hypermedia + SSE; no JS build step — not htmx, not React) |
 | Templating | Jinja2 |
 | Object storage client | `aioboto3` |
 | Task queue | ARQ (Async Redis Queue) |
-| Auth | Keycloak OIDC (`python-jose` or `authlib` for JWT) |
+| Auth | Keycloak OIDC (`python-jose` for JWT; `DEV_AUTH_BYPASS` for tests) |
 | Orchestration | Kubernetes (Tilt + k3d/kind for local dev) |
 | RO-Crate | `rocrate` Python library |
 | File preview | `mistune`, `polars`, `pygments` |
-| Notifications | Jinja2 email templates (HTML + `.txt` pairs in `trevor/notifications/templates/`) |
+| Notifications | Jinja2 email templates (planned) |
 
 ---
 
 ## Project layout
 
 ```
-src/trevor/__init__.py      # sole source file — stub main()
-spec/                       # authoritative design docs (read before implementing)
-  CONSTRAINTS.md            # non-negotiable constraints (C-01 – C-13)
-  DOMAIN_MODEL.md           # entity definitions, state machines, field-level detail
-  ITERATION_PLAN.md         # delivery plan; spec must be written before each iteration's code
+src/trevor/
+  __init__.py              # main() entrypoint → uvicorn
+  app.py                   # FastAPI factory, lifespan, router registration
+  settings.py              # pydantic-settings BaseSettings (all env vars)
+  database.py              # async engine (lru_cache by URL), session factory, get_session dep
+  auth.py                  # AuthContext dep, DEV_AUTH_BYPASS, require_admin
+  storage.py               # aioboto3 S3 abstraction (upload, presigned URLs)
+  worker.py                # ARQ WorkerSettings, job stubs
+  models/
+    user.py                # User (Keycloak shadow record)
+    project.py             # Project, ProjectMembership, ProjectStatus, ProjectRole
+  schemas/
+    user.py                # UserRead, UserMeRead
+    project.py             # ProjectRead
+    membership.py          # MembershipCreate, MembershipRead
+  services/
+    user_service.py        # upsert_user (create/update shadow from JWT claims)
+    membership_service.py  # CRUD + role conflict validation
+  routers/
+    users.py               # GET /users/me
+    projects.py            # GET /projects, GET /projects/{id}
+    memberships.py         # POST /memberships (admin), GET, DELETE
+tests/
+  conftest.py              # fixtures: in-memory SQLite, client, admin_client, sample data
+  test_health.py
+  test_users.py
+  test_projects.py
+  test_memberships.py
+alembic/                   # async Alembic config, migrations
+helm/trevor/               # Helm chart skeleton
+.github/workflows/ci.yml   # lint → test → docker build
+Dockerfile                 # multi-stage, non-root user
+Tiltfile                   # k3d/kind local dev
+spec/                      # authoritative design docs (read before implementing)
+  CONSTRAINTS.md           # non-negotiable constraints (C-01 – C-13)
+  DOMAIN_MODEL.md          # entity definitions, state machines, field-level detail
+  ITERATION_PLAN.md        # delivery plan; spec before code per iteration
   GLOSSARY.md
-  adr/0001-*.md … 0011-*.md # ADRs live directly in spec/ (not in a subdir)
+  0001-*.md … 0011-*.md    # ADRs
 ```
 
-**Spec-first rule**: Each iteration requires writing OpenAPI paths and DB migration spec *before* implementation. Check `spec/ITERATION_PLAN.md` for what needs to be specced first.
+**Spec-first rule**: each iteration requires writing OpenAPI paths and DB migration spec *before* implementation. Check `spec/ITERATION_PLAN.md` for what to spec next.
+
+---
+
+## Architecture patterns
+
+- **App factory**: `create_app(settings)` in `app.py`. Module-level `app = create_app()` for uvicorn.
+- **Dependency injection**: `get_session`, `get_settings`, `get_auth_context` are FastAPI deps. Tests override via `app.dependency_overrides`.
+- **Engine caching**: `get_engine(url)` is `@lru_cache` — one engine per URL. Tests use `sqlite+aiosqlite:///:memory:`.
+- **Auth**: `AuthContext` dataclass holds `User` (DB model) + `realm_roles` + `is_admin`. `CurrentAuth` type alias for Depends injection. `RequireAdmin` chains admin check.
+- **User upsert**: on every authed request, `upsert_user()` creates/updates User shadow record from Keycloak claims. Keycloak is source of truth for identity (C-10).
+- **Role conflict enforcement**: `validate_no_role_conflict()` prevents researcher + checker on same project (C-04). Checked before every membership create.
 
 ---
 
@@ -80,7 +118,7 @@ spec/                       # authoritative design docs (read before implementin
 - **C-02**: Researchers never hold S3 credentials. trevor is the sole storage proxy.
 - **C-03**: `OutputObject` is immutable after submission. SHA-256 checksum verified at every state transition. No PUT/DELETE/PATCH on file content.
 - **C-04**: Every request needs exactly 2 distinct reviewers before approval. Submitter cannot review. Researcher cannot check their own project.
-- **C-05**: `AuditEvent` table is append-only. No UPDATE or DELETE ever — enforce via a DB role with INSERT-only permission.
+- **C-05**: `AuditEvent` table is append-only. No UPDATE or DELETE ever.
 - **C-06**: trevor never writes Kubernetes CRDs — project data is read-only from CR8TOR.
 - **C-07**: Kubernetes-only. No Docker Compose production path.
 - **C-08**: Application tier must be stateless (state in DB or Redis only).
@@ -92,7 +130,9 @@ spec/                       # authoritative design docs (read before implementin
 
 ## Domain model essentials
 
-**Core entities** (all UUID PKs): `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `Review`, `AuditEvent`, `ReleaseRecord`, `Notification`.
+**Implemented entities**: `User`, `Project`, `ProjectMembership` (all UUID PKs).
+
+**Planned entities**: `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `Review`, `AuditEvent`, `ReleaseRecord`, `Notification`.
 
 **`AirlockRequest` states**:
 `DRAFT → SUBMITTED → AGENT_REVIEW → HUMAN_REVIEW → CHANGES_REQUESTED / APPROVED → RELEASING → RELEASED` (or `REJECTED`)
@@ -103,9 +143,7 @@ spec/                       # authoritative design docs (read before implementin
 
 **Agent identity**: `agent:trevor-agent` (used as actor in `AuditEvent`)
 
-**S3 key format**: `{project_id}/{request_id}/{logical_object_id}/{version}/{uuid4}-{filename}` — uniqueness by construction, no overwrite possible.
-
-**`OutputObjectMetadata`** uses optimistic locking (`version` counter) for concurrent updates.
+**S3 key format**: `{project_id}/{request_id}/{logical_object_id}/{version}/{uuid4}-{filename}`
 
 **Keycloak global admin role** (`tre_admin`) is read from JWT `realm_access.roles` on every request — not cached locally.
 
@@ -116,13 +154,48 @@ spec/                       # authoritative design docs (read before implementin
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | `sqlite+aiosqlite:///./trevor.db` locally; `postgresql+asyncpg://...` in prod |
-| `DEV_AUTH_BYPASS` | Skip Keycloak — required for tests without a live Keycloak instance |
+| `DEV_AUTH_BYPASS` | Skip Keycloak JWT validation — for tests and local dev |
 | `REDIS_URL` | ARQ queue; e.g. `redis://trevor-redis:6379/0` |
+| `KEYCLOAK_URL` | Keycloak base URL |
+| `KEYCLOAK_REALM` | Realm name (default: `karectl`) |
+| `KEYCLOAK_CLIENT_ID` | OIDC client ID (default: `trevor`) |
+| `S3_ENDPOINT_URL` | MinIO URL for local dev; empty for AWS |
+| `S3_ACCESS_KEY_ID` | S3 credentials |
+| `S3_SECRET_ACCESS_KEY` | S3 credentials |
+| `S3_QUARANTINE_BUCKET` | Upload quarantine bucket (default: `trevor-quarantine`) |
+| `S3_RELEASE_BUCKET` | Release bucket (default: `trevor-release`) |
 
-S3 credentials and Keycloak client secrets are injected via Kubernetes Secrets as env vars.
+S3 credentials and Keycloak client secrets are injected via Kubernetes Secrets in prod.
 
 ---
 
-## Local dev prerequisites (not yet set up — Iteration 0 deliverable)
+## API endpoints
 
-Full local dev stack requires: **Tilt + k3d/kind**, **MinIO** (local S3), **Keycloak** dev container, **Redis**. Unit tests can avoid all of these with `DEV_AUTH_BYPASS` and a SQLite URL.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/health` | None | Liveness/readiness probe |
+| `GET` | `/users/me` | Any | Current user + memberships + realm roles |
+| `GET` | `/projects` | Any | List all projects |
+| `GET` | `/projects/{id}` | Any | Get project by ID |
+| `GET` | `/memberships/project/{id}` | Any | List memberships for project |
+| `POST` | `/memberships` | `tre_admin` | Create membership (role conflict validated) |
+| `DELETE` | `/memberships/{id}` | `tre_admin` | Remove membership |
+
+---
+
+## Local dev
+
+Full local dev stack requires: **Tilt + k3d/kind**, **MinIO** (local S3), **Keycloak** dev container, **Redis**. Unit tests avoid all of these with `DEV_AUTH_BYPASS=true` and in-memory SQLite.
+
+```bash
+uv sync && uv run pytest -v    # quick check — no external deps needed
+```
+
+---
+
+## Git workflow
+
+- Commit after each discrete piece of work (new model, new router, bug fix, config change). Do not batch unrelated changes.
+- Terse commit messages. Conventional Commits format. Subject ≤50 chars, body only when "why" isn't obvious from the diff.
+- Run `uv run ruff check . && uv run ruff format --check . && uv run pytest -v` before every commit.
+- Do not push unless explicitly asked.
