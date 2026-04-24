@@ -48,6 +48,7 @@ No `make`, `just`, or `task` — `uv run` only.
 | Task queue | ARQ (Async Redis Queue) |
 | Auth | Keycloak OIDC (`python-jose` for JWT; `DEV_AUTH_BYPASS` for tests) |
 | Orchestration | Kubernetes (Tilt + k3d/kind for local dev) |
+| Agent framework | Pydantic-AI (OpenAI-compatible backend) |
 | RO-Crate | `rocrate` Python library |
 | File preview | `mistune`, `polars`, `pygments` |
 | Notifications | Jinja2 email templates (planned) |
@@ -66,14 +67,14 @@ src/trevor/
   storage.py               # aioboto3 S3 abstraction (upload, presigned URLs)
   worker.py                # ARQ WorkerSettings, job stubs
   models/
-    user.py                # User (Keycloak shadow record)
+    user.py                # User (synced from CRD + Keycloak; nullable keycloak_sub)
     project.py             # Project, ProjectMembership, ProjectStatus, ProjectRole
   schemas/
     user.py                # UserRead, UserMeRead
     project.py             # ProjectRead
     membership.py          # MembershipCreate, MembershipRead
   services/
-    user_service.py        # upsert_user (create/update shadow from JWT claims)
+    user_service.py        # upsert_user (create/update from CRD sync or JWT claims)
     membership_service.py  # CRUD + role conflict validation
   routers/
     users.py               # GET /users/me
@@ -95,7 +96,7 @@ spec/                      # authoritative design docs (read before implementing
   DOMAIN_MODEL.md          # entity definitions, state machines, field-level detail
   ITERATION_PLAN.md        # delivery plan; spec before code per iteration
   GLOSSARY.md
-  0001-*.md … 0011-*.md    # ADRs
+  0001-*.md … 0012-*.md    # ADRs
 ```
 
 **Spec-first rule**: each iteration requires writing OpenAPI paths and DB migration spec *before* implementation. Check `spec/ITERATION_PLAN.md` for what to spec next.
@@ -108,7 +109,7 @@ spec/                      # authoritative design docs (read before implementing
 - **Dependency injection**: `get_session`, `get_settings`, `get_auth_context` are FastAPI deps. Tests override via `app.dependency_overrides`.
 - **Engine caching**: `get_engine(url)` is `@lru_cache` — one engine per URL. Tests use `sqlite+aiosqlite:///:memory:`.
 - **Auth**: `AuthContext` dataclass holds `User` (DB model) + `realm_roles` + `is_admin`. `CurrentAuth` type alias for Depends injection. `RequireAdmin` chains admin check.
-- **User upsert**: on every authed request, `upsert_user()` creates/updates User shadow record from Keycloak claims. Keycloak is source of truth for identity (C-10).
+- **User upsert**: on every authed request, `upsert_user()` creates/updates User shadow record from Keycloak claims. Users may also be pre-created from CRD sync with nullable `keycloak_sub`. Keycloak is source of truth for identity (C-10).
 - **Role conflict enforcement**: `validate_no_role_conflict()` prevents researcher + checker on same project (C-04). Checked before every membership create.
 
 ---
@@ -153,7 +154,7 @@ spec/                      # authoritative design docs (read before implementing
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./trevor.db` locally; `postgresql+asyncpg://...` in prod |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./local/trevor.db` locally; `postgresql+asyncpg://...` in prod |
 | `DEV_AUTH_BYPASS` | Skip Keycloak JWT validation — for tests and local dev |
 | `REDIS_URL` | ARQ queue; e.g. `redis://trevor-redis:6379/0` |
 | `KEYCLOAK_URL` | Keycloak base URL |
@@ -166,6 +167,15 @@ spec/                      # authoritative design docs (read before implementing
 | `S3_RELEASE_BUCKET` | Release bucket (default: `trevor-release`) |
 
 S3 credentials and Keycloak client secrets are injected via Kubernetes Secrets in prod.
+
+Agent settings (planned):
+
+| Variable | Purpose |
+|---|---|
+| `AGENT_OPENAI_BASE_URL` | OpenAI-compatible LLM endpoint |
+| `AGENT_MODEL_NAME` | Model to use for agent (default: configurable) |
+| `AGENT_API_KEY` | API key for LLM backend |
+| `AGENT_LLM_ENABLED` | Enable/disable agent LLM calls (default: `false`) |
 
 ---
 
