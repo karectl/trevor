@@ -42,28 +42,34 @@ Project (from CRD)
 ## Core entities
 
 ### User
-Synced from Keycloak on first login. trevor holds a local shadow record for audit FK integrity.
+Synced from CR8TOR User CRDs on reconcile. `keycloak_sub` is populated on first successful Keycloak login. trevor holds this local shadow record for audit FK integrity and to support checker assignment before a user's first login.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | UUID | trevor-internal |
-| `keycloak_sub` | str | Keycloak subject claim |
-| `email` | str | |
-| `display_name` | str | |
+| `id` | UUID | trevor-internal (not the CR8TOR project UUID) |
+| `keycloak_sub` | str \| null | Keycloak subject claim — set on first login |
+| `username` | str | From `spec.username` in User CRD — matches Keycloak `preferred_username` |
+| `email` | str | From `spec.email` |
+| `given_name` | str | From `spec.given_name` |
+| `family_name` | str | From `spec.family_name` |
+| `affiliation` | str | From `spec.affiliation` |
+| `crd_name` | str | `metadata.name` from User CRD |
+| `active` | bool | From `spec.enabled`; false blocks login |
+| `synced_at` | datetime | Last CRD sync |
 | `created_at` | datetime | |
 
 ---
 
 ### Project
-Read from Kubernetes CRD. trevor caches a denormalised copy to avoid hammering the k8s API. Refreshed via a watch/reconcile loop.
+Read from CR8TOR `research.karectl.io/v1alpha1/Project` CRDs. The canonical project UUID comes from the `cr8tor.io/project-id` label, ensuring consistency with the rest of the karectl platform.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | UUID | trevor-internal |
-| `crd_name` | str | k8s CRD resource name |
-| `display_name` | str | |
-| `status` | enum | `active` / `suspended` / `archived` |
-| `synced_at` | datetime | Last CRD sync |
+| `id` | UUID | From `cr8tor.io/project-id` label on Project CRD |
+| `crd_name` | str | `metadata.name` from Project CRD (e.g. `lancs-tre-proj-1`) |
+| `display_name` | str | From `spec.description`; falls back to `metadata.name` |
+| `status` | enum | `active` (CRD present) / `archived` (CRD deleted from cluster) |
+| `synced_at` | datetime | Last CRD reconcile |
 
 ---
 

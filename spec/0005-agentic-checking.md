@@ -1,7 +1,8 @@
-# ADR-0005 — Agentic Output Checking: Advisory, Statbarn-Based
+# ADR-0005 — Agentic Output Checking: Advisory, Statbarn-Based, Pydantic-AI
 
 **Status**: Accepted  
 **Date**: 2025-01  
+**Updated**: 2025-01 (Pydantic-AI selected as agent framework; LLM backend clarified)  
 **Deciders**: trevor project lead
 
 ---
@@ -52,16 +53,48 @@ The agent is recorded with identity `agent:trevor-agent` in the `Review` table.
 
 ### 4. Implementation approach
 
-The agent is invoked as an async background task via FastAPI's `BackgroundTasks` or a lightweight task queue (ARQ / Celery — see ADR-0008). It:
+The agent is invoked as an ARQ background task (see ADR-0008) triggered by the `request.submitted` event. It:
 
 1. Fetches the output objects from quarantine storage
-2. Runs statbarn classification and rule checks
-3. Calls an LLM (configurable — Anthropic Claude, or local model) for the narrative explanation component
+2. Runs deterministic statbarn classification and rule checks (no LLM required)
+3. Calls the LLM via Pydantic-AI for the narrative explanation component
 4. Writes a `Review` record with `reviewer_type=agent`
 5. Emits a `review.created` audit event
 6. Triggers notification to assigned checkers
 
-The LLM call is optional and configurable. If disabled, the agent produces rule-check-only reports without narrative explanation.
+#### Agent framework: Pydantic-AI
+
+**Pydantic-AI** is used as the agent framework. It integrates natively with Pydantic v2 models (already a platform standard — C-13) and provides:
+
+- **Structured output**: agent tool calls and responses are typed Pydantic models — no JSON parsing, no prompt engineering for output format
+- **OpenAI-compatible backend**: `pydantic_ai.models.openai.OpenAIModel` accepts any OpenAI-compatible endpoint URL, covering the karectl-provided endpoint without vendor lock-in
+- **Dependency injection**: agent dependencies (S3 client, rule engine, request context) are typed and injected via `RunContext[Deps]` — testable without mocking the LLM
+- **Retry and error handling**: built-in validation retry loop if the model returns a malformed response
+- **Streaming**: supports streamed responses for progressive report rendering via SSE to the checker UI
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIModel
+
+model = OpenAIModel(
+    model_name=settings.agent_model_name,  # e.g. "gpt-4o"
+    base_url=settings.agent_openai_base_url,  # OpenAI-compatible endpoint
+    api_key=settings.agent_api_key,
+)
+
+agent = Agent(
+    model=model,
+    deps_type=AgentDeps,
+    result_type=AgentReviewReport,  # Pydantic model — structured output
+    system_prompt=SYSTEM_PROMPT,
+)
+```
+
+The `AgentReviewReport` Pydantic model mirrors the structured findings stored in the `Review.findings` JSON column.
+
+The LLM call covers narrative explanation only. The deterministic rule checks (statbarn classification, threshold checks, suppression validation) run before the LLM call and are passed as context, so the LLM is used for synthesis and communication, not for rule evaluation.
+
+The LLM call is optional and configurable. If `AGENT_LLM_ENABLED=false`, the agent produces rule-check-only reports without narrative explanation.
 
 ### 5. Human override
 
@@ -86,6 +119,8 @@ If a human checker's decision contradicts the agent's recommendation:
 - **Positive**: Reduces checker workload for low-risk, well-documented outputs.
 - **Positive**: Consistent application of statbarn rules regardless of checker experience.
 - **Positive**: Agent reports serve as a training aid for newer checkers.
-- **Negative**: Agent rule engine must be maintained as statbarn rules evolve.
-- **Negative**: LLM-generated narrative introduces a cost and latency dependency. Mitigation: LLM is optional; rule-check-only mode is always available.
-- **Mitigation for rule drift**: Statbarn rules are versioned in the trevor codebase. The rule set version is recorded in each agent review.
+- **Positive**: Pydantic-AI's structured output eliminates prompt-engineering fragility for report format — the schema is enforced at the type level.
+- **Positive**: OpenAI-compatible endpoint means the LLM provider can be swapped (hosted, local, different vendor) by changing two config values.
+- **Positive**: Pydantic-AI dependency injection makes the agent fully unit-testable without a live LLM (use `pydantic_ai.models.test.TestModel`).
+- **Negative**: Agent rule engine must be maintained as statbarn rules evolve. Mitigation: rule set is versioned; version is recorded in each agent review.
+- **Negative**: LLM call introduces cost and latency. Mitigation: deterministic rules run first and are cheap; LLM call is scoped to narrative synthesis only and is optional.
