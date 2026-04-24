@@ -12,9 +12,15 @@ class UserRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
-    keycloak_sub: str
+    keycloak_sub: str | None
+    username: str
     email: str
-    display_name: str
+    given_name: str
+    family_name: str
+    affiliation: str
+    crd_name: str
+    active: bool
+    crd_synced_at: datetime
     created_at: datetime
 
 

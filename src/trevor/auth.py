@@ -44,7 +44,18 @@ async def get_auth_context(
         name = "Dev Admin" if is_admin else "Dev User"
         roles = ["tre_admin"] if is_admin else ["researcher"]
 
-        user = await upsert_user(keycloak_sub=sub, email=email, display_name=name, session=session)
+        user = await upsert_user(
+            keycloak_sub=sub,
+            email=email,
+            display_name=name,
+            username=sub,
+            given_name="Dev",
+            family_name="User" if not is_admin else "Admin",
+            affiliation="dev",
+            crd_name="dev-user",
+            active=True,
+            session=session,
+        )
         return AuthContext(user=user, realm_roles=roles, is_admin=is_admin)
 
     if credentials is None:

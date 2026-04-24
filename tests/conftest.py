@@ -23,7 +23,6 @@ def dev_settings() -> Settings:
 @pytest.fixture
 async def engine():
     eng = create_async_engine(TEST_DB_URL, echo=False, future=True)
-    # Import models so metadata has all tables.
     import trevor.models  # noqa: F401
 
     async with eng.begin() as conn:
@@ -80,7 +79,16 @@ async def admin_client(dev_settings, engine):
 
 @pytest.fixture
 async def sample_user(db_session) -> User:
-    user = User(keycloak_sub="test-sub-1", email="test@example.com", display_name="Test User")
+    user = User(
+        keycloak_sub="test-sub-1",
+        username="testuser1",
+        email="test@example.com",
+        given_name="Test",
+        family_name="User",
+        affiliation="Test Org",
+        crd_name="testuser1",
+        active=True,
+    )
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)

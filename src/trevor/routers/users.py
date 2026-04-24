@@ -22,8 +22,14 @@ async def get_me(
     return UserMeRead(
         id=auth.user.id,
         keycloak_sub=auth.user.keycloak_sub,
+        username=auth.user.username,
         email=auth.user.email,
-        display_name=auth.user.display_name,
+        given_name=auth.user.given_name,
+        family_name=auth.user.family_name,
+        affiliation=auth.user.affiliation,
+        crd_name=auth.user.crd_name,
+        active=auth.user.active,
+        crd_synced_at=auth.user.crd_synced_at,
         created_at=auth.user.created_at,
         memberships=[m.model_dump() for m in memberships],  # type: ignore[union-attr]
         realm_roles=auth.realm_roles,

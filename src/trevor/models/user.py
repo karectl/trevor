@@ -1,4 +1,4 @@
-"""User model — shadow record synced from Keycloak."""
+"""User model — shadow record synced from CR8TOR."""
 
 import uuid
 from datetime import UTC, datetime
@@ -14,7 +14,13 @@ class User(SQLModel, table=True):
     __tablename__ = "users"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    keycloak_sub: str = Field(unique=True, index=True)
-    email: str = Field(default="")
-    display_name: str = Field(default="")
+    keycloak_sub: str | None = Field(default=None, unique=True, index=True)
+    username: str
+    email: str
+    given_name: str
+    family_name: str
+    affiliation: str
+    crd_name: str
+    active: bool
+    crd_synced_at: datetime = Field(default_factory=_utcnow)
     created_at: datetime = Field(default_factory=_utcnow)

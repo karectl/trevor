@@ -13,7 +13,6 @@ def _utcnow() -> datetime:
 
 class ProjectStatus(enum.StrEnum):
     ACTIVE = "active"
-    SUSPENDED = "suspended"
     ARCHIVED = "archived"
 
 
