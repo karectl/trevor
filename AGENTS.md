@@ -64,28 +64,44 @@ src/trevor/
   settings.py              # pydantic-settings BaseSettings (all env vars)
   database.py              # async engine (lru_cache by URL), session factory, get_session dep
   auth.py                  # AuthContext dep, DEV_AUTH_BYPASS, require_admin
-  storage.py               # aioboto3 S3 abstraction (upload, presigned URLs)
-  worker.py                # ARQ WorkerSettings, job stubs
+  storage.py               # aioboto3 S3 abstraction (upload, download, presigned URLs)
+  worker.py                # ARQ WorkerSettings, agent_review_job, cron stubs
+  agent/
+    __init__.py
+    rules.py               # statbarn rule engine (pure functions, no I/O)
+    agent.py               # Pydantic-AI agent orchestration + LLM narrative
+    prompts.py             # system prompt, template-based narratives
+    schemas.py             # RuleResult, ObjectAssessment dataclasses
   models/
     user.py                # User (synced from CRD + Keycloak; nullable keycloak_sub)
     project.py             # Project, ProjectMembership, ProjectStatus, ProjectRole
+    request.py             # AirlockRequest, OutputObject, OutputObjectMetadata, AuditEvent
+    review.py              # Review, ReviewerType, ReviewDecision
   schemas/
     user.py                # UserRead, UserMeRead
     project.py             # ProjectRead
     membership.py          # MembershipCreate, MembershipRead
+    request.py             # RequestCreate/Read, OutputObjectRead, MetadataRead, AuditEventRead
+    review.py              # ReviewRead
   services/
     user_service.py        # upsert_user (create/update from CRD sync or JWT claims)
     membership_service.py  # CRUD + role conflict validation
+    audit_service.py       # emit() helper for AuditEvent
   routers/
     users.py               # GET /users/me
     projects.py            # GET /projects, GET /projects/{id}
     memberships.py         # POST /memberships (admin), GET, DELETE
+    requests.py            # CRUD + submit + upload for AirlockRequest/OutputObject
+    reviews.py             # GET /requests/{id}/reviews
 tests/
   conftest.py              # fixtures: in-memory SQLite, client, admin_client, sample data
   test_health.py
   test_users.py
   test_projects.py
   test_memberships.py
+  test_requests.py
+  test_rules.py            # statbarn rule engine unit tests
+  test_reviews.py          # agent review job + review endpoint tests
 alembic/                   # async Alembic config, migrations
 helm/trevor/               # Helm chart skeleton
 .github/workflows/ci.yml   # lint → test → docker build
@@ -131,9 +147,9 @@ spec/                      # authoritative design docs (read before implementing
 
 ## Domain model essentials
 
-**Implemented entities**: `User`, `Project`, `ProjectMembership` (all UUID PKs).
+**Implemented entities**: `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `AuditEvent`, `Review` (all UUID PKs).
 
-**Planned entities**: `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `Review`, `AuditEvent`, `ReleaseRecord`, `Notification`.
+**Planned entities**: `ReleaseRecord`, `Notification`.
 
 **`AirlockRequest` states**:
 `DRAFT → SUBMITTED → AGENT_REVIEW → HUMAN_REVIEW → CHANGES_REQUESTED / APPROVED → RELEASING → RELEASED` (or `REJECTED`)
@@ -190,6 +206,18 @@ Agent settings (planned):
 | `GET` | `/memberships/project/{id}` | Any | List memberships for project |
 | `POST` | `/memberships` | `tre_admin` | Create membership (role conflict validated) |
 | `DELETE` | `/memberships/{id}` | `tre_admin` | Remove membership |
+| `POST` | `/requests` | Researcher | Create airlock request |
+| `GET` | `/requests` | Any | List requests (filtered by membership) |
+| `GET` | `/requests/{id}` | Member/Admin | Get request with objects |
+| `POST` | `/requests/{id}/submit` | Owner/Admin | Submit request → enqueue agent review |
+| `POST` | `/requests/{id}/objects` | Researcher | Upload output object |
+| `GET` | `/requests/{id}/objects` | Member/Admin | List objects |
+| `GET` | `/requests/{id}/objects/{oid}` | Member/Admin | Get object |
+| `PATCH` | `/requests/{id}/objects/{oid}/metadata` | Researcher | Update metadata |
+| `GET` | `/requests/{id}/objects/{oid}/metadata` | Member/Admin | Get metadata |
+| `GET` | `/requests/{id}/audit` | Member/Admin | List audit events |
+| `GET` | `/requests/{id}/reviews` | Member/Admin | List reviews |
+| `GET` | `/requests/{id}/reviews/{rid}` | Member/Admin | Get single review |
 
 ---
 

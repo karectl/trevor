@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     s3_release_bucket: str = "trevor-release"
     s3_region: str = "us-east-1"
 
+    # Agent
+    agent_openai_base_url: str = ""
+    agent_model_name: str = "gpt-4o"
+    agent_api_key: str = ""
+    agent_llm_enabled: bool = False
+    agent_min_cell_count: int = 10
+    agent_dominance_p: int = 70
+
     # App
     app_title: str = "trevor"
     app_version: str = "0.1.0"

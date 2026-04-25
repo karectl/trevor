@@ -11,6 +11,7 @@ from trevor.models.request import (
     OutputObjectState,
     OutputType,
 )
+from trevor.models.review import Review, ReviewDecision, ReviewerType
 from trevor.models.user import User
 
 __all__ = [
@@ -26,5 +27,8 @@ __all__ = [
     "ProjectMembership",
     "ProjectRole",
     "ProjectStatus",
+    "Review",
+    "ReviewDecision",
+    "ReviewerType",
     "User",
 ]

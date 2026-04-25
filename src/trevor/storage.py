@@ -64,6 +64,19 @@ async def upload_fileobj(
         await client.upload_fileobj(fileobj, bucket, key, ExtraArgs={"ContentType": content_type})
 
 
+async def download_object(
+    *,
+    bucket: str,
+    key: str,
+    settings: Settings | None = None,
+) -> bytes:
+    """Download object from S3 and return bytes."""
+    async with s3_client(settings) as client:
+        response = await client.get_object(Bucket=bucket, Key=key)
+        data: bytes = await response["Body"].read()
+    return data
+
+
 async def generate_presigned_get_url(
     *,
     bucket: str,

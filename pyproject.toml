@@ -19,6 +19,7 @@ dependencies = [
     "polars>=1.39.3",
     "pygments>=2.20.0",
     "pydantic-settings>=2.13.1",
+    "pydantic-ai>=0.2.0",
 ]
 
 [project.scripts]

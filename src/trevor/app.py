@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from trevor.database import create_db_and_tables, get_engine
-from trevor.routers import memberships, projects, requests, users
+from trevor.routers import memberships, projects, requests, reviews, users
 from trevor.settings import Settings, get_settings
 
 
@@ -43,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(projects.router)
     app.include_router(memberships.router)
     app.include_router(requests.router)
+    app.include_router(reviews.router)
 
     return app
 

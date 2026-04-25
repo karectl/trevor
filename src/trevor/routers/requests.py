@@ -151,6 +151,7 @@ async def submit_request(
     request_id: uuid.UUID,
     auth: CurrentAuth,
     session: Session,
+    settings: SettingsDep,
 ) -> AirlockRequest:
     req = await _get_request_or_404(request_id, session)
     if req.submitted_by != auth.user.id and not auth.is_admin:
@@ -177,6 +178,22 @@ async def submit_request(
     )
     await session.commit()
     await session.refresh(req)
+
+    # Enqueue agent review (inline in dev mode, ARQ in prod)
+    if settings.dev_auth_bypass:
+        import logging
+
+        logging.getLogger(__name__).info(
+            "Dev mode: skipping ARQ enqueue for agent_review_job (request %s)", req.id
+        )
+    else:
+        from arq.connections import ArqRedis, create_pool
+        from arq.connections import RedisSettings as ArqRedisSettings
+
+        pool: ArqRedis = await create_pool(ArqRedisSettings.from_dsn(settings.redis_url))
+        await pool.enqueue_job("agent_review_job", str(req.id))
+        await pool.aclose()
+
     return req
 
 
