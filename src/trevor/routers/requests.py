@@ -379,3 +379,196 @@ async def list_audit(
         select(AuditEvent).where(AuditEvent.request_id == request_id).order_by(AuditEvent.timestamp)
     )
     return list(result.all())
+
+
+@router.post(
+    "/{request_id}/objects/{object_id}/replace",
+    status_code=status.HTTP_201_CREATED,
+    response_model=OutputObjectRead,
+)
+async def replace_object(
+    request_id: uuid.UUID,
+    object_id: uuid.UUID,
+    auth: CurrentAuth,
+    session: Session,
+    settings: SettingsDep,
+    file: UploadFile,
+    output_type: Annotated[OutputType, Form()],
+    statbarn: Annotated[str, Form()] = "",
+) -> OutputObject:
+    """Upload a replacement for an existing output object."""
+    req = await _get_request_or_404(request_id, session)
+    if req.status != AirlockRequestStatus.CHANGES_REQUESTED:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Request in {req.status}, expected CHANGES_REQUESTED",
+        )
+    await _assert_researcher(req.project_id, auth.user.id, session)
+
+    original = await session.get(OutputObject, object_id)
+    if original is None or original.request_id != request_id:
+        raise HTTPException(status_code=404, detail="Object not found")
+
+    replaceable = {OutputObjectState.CHANGES_REQUESTED, OutputObjectState.REJECTED}
+    if original.state not in replaceable:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot replace object in {original.state} state",
+        )
+
+    raw = await file.read()
+    checksum = hashlib.sha256(raw).hexdigest()
+    size = len(raw)
+
+    new_version = original.version + 1
+    new_id = uuid.uuid4()
+    storage_key = (
+        f"{req.project_id}/{req.id}/{original.logical_object_id}"
+        f"/{new_version}/{new_id}-{file.filename}"
+    )
+
+    if not settings.dev_auth_bypass:
+        from trevor.storage import upload_fileobj
+
+        await upload_fileobj(
+            bucket=settings.s3_quarantine_bucket,
+            key=storage_key,
+            fileobj=io.BytesIO(raw),
+            content_type=file.content_type or "application/octet-stream",
+            settings=settings,
+        )
+
+    # Supersede original
+    original.state = OutputObjectState.SUPERSEDED
+    session.add(original)
+
+    # Create replacement
+    new_obj = OutputObject(
+        id=new_id,
+        request_id=request_id,
+        version=new_version,
+        replaces_id=original.id,
+        logical_object_id=original.logical_object_id,
+        filename=file.filename or "unknown",
+        output_type=output_type,
+        statbarn=statbarn,
+        storage_key=storage_key,
+        checksum_sha256=checksum,
+        size_bytes=size,
+        uploaded_by=auth.user.id,
+    )
+    session.add(new_obj)
+
+    # Ensure metadata exists (carries forward via shared logical_object_id)
+    meta = await session.get(OutputObjectMetadata, original.logical_object_id)
+    if meta is None:
+        meta = OutputObjectMetadata(logical_object_id=original.logical_object_id)
+        session.add(meta)
+
+    await audit_service.emit(
+        session,
+        event_type="object.replaced",
+        actor_id=str(auth.user.id),
+        request_id=request_id,
+        payload={
+            "original_object_id": str(original.id),
+            "new_object_id": str(new_id),
+            "version": new_version,
+            "checksum_sha256": checksum,
+        },
+    )
+    await session.commit()
+    await session.refresh(new_obj)
+    return new_obj
+
+
+@router.post("/{request_id}/resubmit", response_model=RequestRead)
+async def resubmit_request(
+    request_id: uuid.UUID,
+    auth: CurrentAuth,
+    session: Session,
+    settings: SettingsDep,
+) -> AirlockRequest:
+    """Resubmit a request after addressing checker feedback."""
+    req = await _get_request_or_404(request_id, session)
+    if req.submitted_by != auth.user.id and not auth.is_admin:
+        raise HTTPException(status_code=403, detail="Not request owner")
+    if req.status != AirlockRequestStatus.CHANGES_REQUESTED:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot resubmit from {req.status}, expected CHANGES_REQUESTED",
+        )
+
+    # Must have at least one PENDING object
+    result = await session.exec(
+        select(OutputObject).where(
+            OutputObject.request_id == request_id,
+            OutputObject.state == OutputObjectState.PENDING,
+        )
+    )
+    if not result.first():
+        raise HTTPException(
+            status_code=422,
+            detail="No pending objects — upload replacements first",
+        )
+
+    req.status = AirlockRequestStatus.SUBMITTED
+    req.submitted_at = datetime.now(UTC)
+    req.updated_at = datetime.now(UTC)
+    session.add(req)
+    await audit_service.emit(
+        session,
+        event_type="request.resubmitted",
+        actor_id=str(auth.user.id),
+        request_id=req.id,
+    )
+    await session.commit()
+    await session.refresh(req)
+
+    # Enqueue agent review (same as submit)
+    if settings.dev_auth_bypass:
+        import logging
+
+        logging.getLogger(__name__).info(
+            "Dev mode: skipping ARQ enqueue for resubmit (request %s)",
+            req.id,
+        )
+    else:
+        from arq.connections import ArqRedis, create_pool
+        from arq.connections import RedisSettings as ArqRedisSettings
+
+        pool: ArqRedis = await create_pool(ArqRedisSettings.from_dsn(settings.redis_url))
+        await pool.enqueue_job("agent_review_job", str(req.id))
+        await pool.aclose()
+
+    return req
+
+
+@router.get(
+    "/{request_id}/objects/{object_id}/versions",
+    response_model=list[OutputObjectRead],
+)
+async def list_object_versions(
+    request_id: uuid.UUID,
+    object_id: uuid.UUID,
+    auth: CurrentAuth,
+    session: Session,
+) -> list[OutputObject]:
+    """List all versions of the same logical object."""
+    req = await _get_request_or_404(request_id, session)
+    if not auth.is_admin:
+        await _assert_project_access(req.project_id, auth.user.id, session)
+
+    obj = await session.get(OutputObject, object_id)
+    if obj is None or obj.request_id != request_id:
+        raise HTTPException(status_code=404, detail="Object not found")
+
+    result = await session.exec(
+        select(OutputObject)
+        .where(
+            OutputObject.request_id == request_id,
+            OutputObject.logical_object_id == obj.logical_object_id,
+        )
+        .order_by(OutputObject.version)
+    )
+    return list(result.all())

@@ -228,3 +228,241 @@ async def test_upload_audit_event(researcher_setup):
     r = await client.get(f"/requests/{req_id}/audit")
     event_types = [e["event_type"] for e in r.json()]
     assert "object.uploaded" in event_types
+
+
+# --- Iteration 5: Revision cycle ---
+
+
+async def _setup_changes_requested(client, project_id, db_session):
+    """Create request with object in CHANGES_REQUESTED state."""
+    from trevor.models.request import (
+        AirlockRequest,
+        AirlockRequestStatus,
+        OutputObject,
+        OutputObjectState,
+    )
+
+    # Create request
+    r = await client.post(
+        "/requests",
+        json={
+            "project_id": str(project_id),
+            "direction": "egress",
+            "title": "Revision test",
+        },
+    )
+    assert r.status_code == 201
+    request_id = r.json()["id"]
+
+    # Upload object
+    r = await client.post(
+        f"/requests/{request_id}/objects",
+        files={"file": ("data.csv", b"a,b\n1,2\n", "text/csv")},
+        data={"output_type": "tabular", "statbarn": "freq_table"},
+    )
+    assert r.status_code == 201
+    object_id = r.json()["id"]
+
+    # Move request to CHANGES_REQUESTED and object to CHANGES_REQUESTED
+    req = await db_session.get(AirlockRequest, uuid.UUID(request_id))
+    req.status = AirlockRequestStatus.CHANGES_REQUESTED
+    db_session.add(req)
+
+    obj = await db_session.get(OutputObject, uuid.UUID(object_id))
+    obj.state = OutputObjectState.CHANGES_REQUESTED
+    db_session.add(obj)
+    await db_session.commit()
+
+    return request_id, object_id
+
+
+async def test_replace_object(researcher_setup, db_session):
+    client, project_id = researcher_setup
+    request_id, object_id = await _setup_changes_requested(client, project_id, db_session)
+
+    r = await client.post(
+        f"/requests/{request_id}/objects/{object_id}/replace",
+        files={"file": ("data_v2.csv", b"a,b\n10,20\n", "text/csv")},
+        data={"output_type": "tabular", "statbarn": "freq_table"},
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["version"] == 2
+    assert data["replaces_id"] == object_id
+    assert data["state"] == "PENDING"
+    assert data["filename"] == "data_v2.csv"
+
+    # Original should be SUPERSEDED
+    r = await client.get(f"/requests/{request_id}/objects/{object_id}")
+    assert r.json()["state"] == "SUPERSEDED"
+
+
+async def test_replace_wrong_state(researcher_setup, db_session):
+    """Cannot replace in DRAFT state."""
+    client, project_id = researcher_setup
+
+    r = await client.post(
+        "/requests",
+        json={
+            "project_id": str(project_id),
+            "direction": "egress",
+            "title": "Draft",
+        },
+    )
+    request_id = r.json()["id"]
+
+    r = await client.post(
+        f"/requests/{request_id}/objects",
+        files={"file": ("d.csv", b"x\n1\n", "text/csv")},
+        data={"output_type": "tabular"},
+    )
+    object_id = r.json()["id"]
+
+    r = await client.post(
+        f"/requests/{request_id}/objects/{object_id}/replace",
+        files={"file": ("d2.csv", b"x\n2\n", "text/csv")},
+        data={"output_type": "tabular"},
+    )
+    assert r.status_code == 409
+    assert "DRAFT" in r.json()["detail"]
+
+
+async def test_replace_approved_object_blocked(researcher_setup, db_session):
+    """Cannot replace an approved object."""
+    from trevor.models.request import OutputObject, OutputObjectState
+
+    client, project_id = researcher_setup
+    request_id, object_id = await _setup_changes_requested(client, project_id, db_session)
+
+    # Set object to APPROVED
+    obj = await db_session.get(OutputObject, uuid.UUID(object_id))
+    obj.state = OutputObjectState.APPROVED
+    db_session.add(obj)
+    await db_session.commit()
+
+    r = await client.post(
+        f"/requests/{request_id}/objects/{object_id}/replace",
+        files={"file": ("new.csv", b"x\n1\n", "text/csv")},
+        data={"output_type": "tabular"},
+    )
+    assert r.status_code == 409
+    assert "APPROVED" in r.json()["detail"]
+
+
+async def test_version_history(researcher_setup, db_session):
+    client, project_id = researcher_setup
+    request_id, object_id = await _setup_changes_requested(client, project_id, db_session)
+
+    # Replace to create v2
+    r = await client.post(
+        f"/requests/{request_id}/objects/{object_id}/replace",
+        files={"file": ("v2.csv", b"a\n10\n", "text/csv")},
+        data={"output_type": "tabular", "statbarn": "test"},
+    )
+    assert r.status_code == 201
+    new_object_id = r.json()["id"]
+
+    # Get versions via original
+    r = await client.get(f"/requests/{request_id}/objects/{object_id}/versions")
+    assert r.status_code == 200
+    versions = r.json()
+    assert len(versions) == 2
+    assert versions[0]["version"] == 1
+    assert versions[1]["version"] == 2
+
+    # Get versions via new object
+    r = await client.get(f"/requests/{request_id}/objects/{new_object_id}/versions")
+    assert len(r.json()) == 2
+
+
+async def test_resubmit(researcher_setup, db_session):
+    client, project_id = researcher_setup
+    request_id, object_id = await _setup_changes_requested(client, project_id, db_session)
+
+    # Replace object (creates PENDING v2)
+    r = await client.post(
+        f"/requests/{request_id}/objects/{object_id}/replace",
+        files={"file": ("v2.csv", b"a\n10\n", "text/csv")},
+        data={"output_type": "tabular", "statbarn": "test"},
+    )
+    assert r.status_code == 201
+
+    # Resubmit
+    r = await client.post(f"/requests/{request_id}/resubmit")
+    assert r.status_code == 200
+    assert r.json()["status"] == "SUBMITTED"
+
+
+async def test_resubmit_wrong_state(researcher_setup):
+    client, project_id = researcher_setup
+
+    r = await client.post(
+        "/requests",
+        json={
+            "project_id": str(project_id),
+            "direction": "egress",
+            "title": "Draft resubmit",
+        },
+    )
+    request_id = r.json()["id"]
+
+    r = await client.post(f"/requests/{request_id}/resubmit")
+    assert r.status_code == 409
+    assert "DRAFT" in r.json()["detail"]
+
+
+async def test_resubmit_requires_pending(researcher_setup, db_session):
+    """Resubmit without pending objects fails."""
+    from trevor.models.request import AirlockRequest, AirlockRequestStatus
+
+    client, project_id = researcher_setup
+
+    r = await client.post(
+        "/requests",
+        json={
+            "project_id": str(project_id),
+            "direction": "egress",
+            "title": "No pending",
+        },
+    )
+    request_id = r.json()["id"]
+
+    # Move to CHANGES_REQUESTED (no objects)
+    req = await db_session.get(AirlockRequest, uuid.UUID(request_id))
+    req.status = AirlockRequestStatus.CHANGES_REQUESTED
+    db_session.add(req)
+    await db_session.commit()
+
+    r = await client.post(f"/requests/{request_id}/resubmit")
+    assert r.status_code == 422
+    assert "pending" in r.json()["detail"].lower()
+
+
+async def test_metadata_preserved_on_replace(researcher_setup, db_session):
+    """Metadata carries forward on replacement (same logical_object_id)."""
+    client, project_id = researcher_setup
+    request_id, object_id = await _setup_changes_requested(client, project_id, db_session)
+
+    # Update metadata on v1
+    r = await client.patch(
+        f"/requests/{request_id}/objects/{object_id}/metadata",
+        json={
+            "title": "My Table",
+            "researcher_justification": "Important analysis",
+        },
+    )
+    assert r.status_code == 200
+
+    # Replace
+    r = await client.post(
+        f"/requests/{request_id}/objects/{object_id}/replace",
+        files={"file": ("v2.csv", b"a\n10\n", "text/csv")},
+        data={"output_type": "tabular", "statbarn": "test"},
+    )
+    new_object_id = r.json()["id"]
+
+    # Metadata on v2 should be same (shared logical_object_id)
+    r = await client.get(f"/requests/{request_id}/objects/{new_object_id}/metadata")
+    assert r.status_code == 200
+    assert r.json()["title"] == "My Table"
+    assert r.json()["researcher_justification"] == "Important analysis"
