@@ -218,6 +218,10 @@ Agent settings (planned):
 | `GET` | `/requests/{id}/audit` | Member/Admin | List audit events |
 | `GET` | `/requests/{id}/reviews` | Member/Admin | List reviews |
 | `GET` | `/requests/{id}/reviews/{rid}` | Member/Admin | Get single review |
+| `POST` | `/requests/{id}/reviews` | Checker/Admin | Submit human review |
+| `POST` | `/requests/{id}/objects/{oid}/replace` | Researcher | Upload replacement object |
+| `POST` | `/requests/{id}/resubmit` | Owner/Admin | Resubmit after changes |
+| `GET` | `/requests/{id}/objects/{oid}/versions` | Member/Admin | List object version history |
 
 ---
 
