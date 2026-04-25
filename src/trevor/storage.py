@@ -51,6 +51,19 @@ async def upload_object(
         await client.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
 
 
+async def upload_fileobj(
+    *,
+    bucket: str,
+    key: str,
+    fileobj: object,
+    content_type: str = "application/octet-stream",
+    settings: Settings | None = None,
+) -> None:
+    """Upload file-like object to S3 (streaming)."""
+    async with s3_client(settings) as client:
+        await client.upload_fileobj(fileobj, bucket, key, ExtraArgs={"ContentType": content_type})
+
+
 async def generate_presigned_get_url(
     *,
     bucket: str,
