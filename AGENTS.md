@@ -89,6 +89,7 @@ src/trevor/
     membership_service.py  # CRUD + role conflict validation
     audit_service.py       # emit() helper for AuditEvent
     release_service.py     # assemble_and_release(), RO-Crate assembly, zip building
+    metrics_service.py     # admin dashboard queries, pipeline metrics
   routers/
     users.py               # GET /users/me
     projects.py            # GET /projects, GET /projects/{id}
@@ -96,6 +97,7 @@ src/trevor/
     requests.py            # CRUD + submit + upload for AirlockRequest/OutputObject
     reviews.py             # GET /requests/{id}/reviews
     releases.py            # POST/GET /requests/{id}/release
+    admin.py               # GET /admin/requests, /metrics, /audit, /audit/export
 tests/
   conftest.py              # fixtures: in-memory SQLite, client, admin_client, sample data
   test_health.py
@@ -106,6 +108,7 @@ tests/
   test_rules.py            # statbarn rule engine unit tests
   test_reviews.py          # agent review job + review endpoint tests
   test_releases.py         # release endpoint + RO-Crate tests
+  test_admin.py            # admin dashboard + metrics endpoint tests
 alembic/                   # async Alembic config, migrations
 helm/trevor/               # Helm chart skeleton
 .github/workflows/ci.yml   # lint → test → docker build
@@ -228,6 +231,10 @@ Agent settings (planned):
 | `GET` | `/requests/{id}/objects/{oid}/versions` | Member/Admin | List object version history |
 | `POST` | `/requests/{id}/release` | `tre_admin` | Trigger release (RO-Crate assembly) |
 | `GET` | `/requests/{id}/release` | Member/Admin | Get release record |
+| `GET` | `/admin/requests` | Admin/Senior | All-projects request overview |
+| `GET` | `/admin/metrics` | Admin/Senior | Pipeline metrics + stuck detection |
+| `GET` | `/admin/audit` | `tre_admin` | Filterable audit log |
+| `GET` | `/admin/audit/export` | `tre_admin` | Export audit log as CSV |
 
 ---
 
