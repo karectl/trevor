@@ -83,16 +83,19 @@ src/trevor/
     membership.py          # MembershipCreate, MembershipRead
     request.py             # RequestCreate/Read, OutputObjectRead, MetadataRead, AuditEventRead
     review.py              # ReviewRead
+    release.py             # ReleaseRecordRead
   services/
     user_service.py        # upsert_user (create/update from CRD sync or JWT claims)
     membership_service.py  # CRUD + role conflict validation
     audit_service.py       # emit() helper for AuditEvent
+    release_service.py     # assemble_and_release(), RO-Crate assembly, zip building
   routers/
     users.py               # GET /users/me
     projects.py            # GET /projects, GET /projects/{id}
     memberships.py         # POST /memberships (admin), GET, DELETE
     requests.py            # CRUD + submit + upload for AirlockRequest/OutputObject
     reviews.py             # GET /requests/{id}/reviews
+    releases.py            # POST/GET /requests/{id}/release
 tests/
   conftest.py              # fixtures: in-memory SQLite, client, admin_client, sample data
   test_health.py
@@ -102,6 +105,7 @@ tests/
   test_requests.py
   test_rules.py            # statbarn rule engine unit tests
   test_reviews.py          # agent review job + review endpoint tests
+  test_releases.py         # release endpoint + RO-Crate tests
 alembic/                   # async Alembic config, migrations
 helm/trevor/               # Helm chart skeleton
 .github/workflows/ci.yml   # lint → test → docker build
@@ -147,9 +151,9 @@ spec/                      # authoritative design docs (read before implementing
 
 ## Domain model essentials
 
-**Implemented entities**: `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `AuditEvent`, `Review` (all UUID PKs).
+**Implemented entities**: `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `AuditEvent`, `Review`, `ReleaseRecord` (all UUID PKs).
 
-**Planned entities**: `ReleaseRecord`, `Notification`.
+**Planned entities**: `Notification`.
 
 **`AirlockRequest` states**:
 `DRAFT → SUBMITTED → AGENT_REVIEW → HUMAN_REVIEW → CHANGES_REQUESTED / APPROVED → RELEASING → RELEASED` (or `REJECTED`)
@@ -222,6 +226,8 @@ Agent settings (planned):
 | `POST` | `/requests/{id}/objects/{oid}/replace` | Researcher | Upload replacement object |
 | `POST` | `/requests/{id}/resubmit` | Owner/Admin | Resubmit after changes |
 | `GET` | `/requests/{id}/objects/{oid}/versions` | Member/Admin | List object version history |
+| `POST` | `/requests/{id}/release` | `tre_admin` | Trigger release (RO-Crate assembly) |
+| `GET` | `/requests/{id}/release` | Member/Admin | Get release record |
 
 ---
 
