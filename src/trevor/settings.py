@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # Release
     presigned_url_ttl: int = 604800  # 7 days
 
+    # Admin
+    stuck_request_hours: int = 72
+
     # App
     app_title: str = "trevor"
     app_version: str = "0.1.0"
