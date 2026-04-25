@@ -142,6 +142,25 @@ Deliverables:
 
 ---
 
+## Iteration 7.5 — Datastar UI
+
+**Goal**: Server-rendered Datastar UI covering all backend functionality from iterations 1–7.
+
+Spec to write first:
+- Template structure, Datastar patterns, SSE endpoints
+- See `spec/iteration-7.5-spec.md` for full spec
+
+Deliverables:
+- Base template shell (nav, project switcher, auth state, flash messages)
+- Researcher views: request list, create, detail, upload, metadata, replace, resubmit
+- Checker views: review queue, review form with agent report alongside
+- Admin views: request overview, metrics dashboard, audit log, membership management
+- File preview component (CSV, markdown, code, image, PDF)
+- SSE live updates (request status, review queue)
+- Minimal custom CSS (no framework, no build step)
+
+---
+
 ## Iteration 8 — Ingress flow
 
 **Goal**: Complete the ingress direction (import into TRE).
@@ -151,6 +170,7 @@ Deliverables:
 - Pre-signed PUT URL for external file submission
 - Review flow (same as egress)
 - Delivery to workspace on approval (pre-signed GET URL for workspace to consume)
+- **UI**: Ingress-specific views (upload via pre-signed PUT, delivery status)
 
 ---
 
@@ -165,6 +185,7 @@ Deliverables:
 - Pen test checklist
 - Production Helm values review
 - Runbook documentation
+- **UI**: CSRF token integration, error pages (403, 404, 500), loading states
 
 ---
 
