@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Any
+from typing import Any, cast
 
 from trevor.agent.prompts import template_object_explanation, template_overall_summary
 from trevor.agent.schemas import ObjectAssessment
@@ -100,7 +100,8 @@ async def _run_llm_narrative(
     """
     from pydantic import BaseModel
     from pydantic_ai import Agent
-    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
 
     from trevor.agent.prompts import SYSTEM_PROMPT
 
@@ -108,11 +109,15 @@ async def _run_llm_narrative(
         overall_summary: str
         object_explanations: dict[str, str]  # object_id → explanation
 
-    model = OpenAIModel(model_name, base_url=openai_base_url, api_key=api_key)
-    agent: Agent[None, ReviewNarrative] = Agent(
-        model,
-        system_prompt=SYSTEM_PROMPT,
-        output_type=ReviewNarrative,
+    provider = OpenAIProvider(base_url=openai_base_url, api_key=api_key)
+    model = OpenAIChatModel(model_name, provider=provider)
+    agent = cast(
+        Agent[None, ReviewNarrative],
+        Agent(
+            model,
+            system_prompt=SYSTEM_PROMPT,
+            output_type=ReviewNarrative,
+        ),
     )
 
     # Build user prompt from assessments
