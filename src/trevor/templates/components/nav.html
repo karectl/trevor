@@ -1,0 +1,19 @@
+<nav class="topnav">
+  <span class="brand">trevor</span>
+  <div class="nav-links">
+    <a href="/ui/requests">Requests</a>
+    {% if is_checker %}
+    <a href="/ui/review">Review Queue</a>
+    {% endif %}
+    {% if is_admin %}
+    <a href="/ui/admin">Admin</a>
+    <a href="/ui/admin/metrics">Metrics</a>
+    <a href="/ui/admin/audit">Audit</a>
+    {% endif %}
+  </div>
+  <span class="spacer"></span>
+  <span class="user-info">
+    {{ user.display_name }}
+    {% if is_admin %}<span class="badge badge-APPROVED">admin</span>{% endif %}
+  </span>
+</nav>

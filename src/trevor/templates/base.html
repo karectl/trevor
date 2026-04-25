@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}trevor{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@starfederation/datastar@1.0.0-beta.11/bundles/datastar.js"></script>
+</head>
+<body>
+<div class="shell">
+  {% include 'components/nav.html' %}
+  <div class="main">
+    {% if flash_message %}
+    <div class="flash flash-{{ flash_type|default('info') }}">{{ flash_message }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+</body>
+</html>

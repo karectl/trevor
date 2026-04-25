@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Review — {{ airlock_request.title }} — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Review: {{ airlock_request.title }}</h1>
+  <p>{{ airlock_request.direction }} &middot; <span class="badge badge-{{ airlock_request.status }}">{{ airlock_request.status|replace("_", " ") }}</span></p>
+</div>
+
+{# Objects + agent findings #}
+<h2 class="mb-1" style="font-size:1rem;">Objects</h2>
+{% for obj in objects %}
+<div class="card">
+  <div class="flex justify-between align-center">
+    <div>
+      <strong>{{ obj.filename }}</strong>
+      <span class="text-muted text-sm">v{{ obj.version }} &middot; {{ obj.output_type }} &middot; {{ (obj.size_bytes / 1024)|round(1) }}KB</span>
+    </div>
+    <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ") }}</span>
+  </div>
+</div>
+{% endfor %}
+
+{% if agent_review %}
+<div class="card mt-2">
+  <h3 style="font-size:.9rem;">Agent Review Summary</h3>
+  <p>{{ agent_review.summary }}</p>
+  {% if agent_review.findings %}
+  <ul class="text-sm mt-1">
+    {% for f in agent_review.findings %}<li>{{ f }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+
+{# Review form #}
+<h2 class="mt-2 mb-1" style="font-size:1rem;">Submit Review</h2>
+<div class="card">
+  <form method="post" action="/ui/review/{{ airlock_request.id }}">
+    <div class="form-group">
+      <label>Overall Decision</label>
+      <div class="flex gap-1">
+        <label><input type="radio" name="decision" value="approved" required> Approve</label>
+        <label><input type="radio" name="decision" value="changes_requested"> Changes Requested</label>
+        <label><input type="radio" name="decision" value="rejected"> Reject</label>
+      </div>
+    </div>
+
+    {% for obj in objects %}
+    {% if obj.state.value == "PENDING" %}
+    <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;margin-bottom:.75rem;">
+      <legend class="text-sm" style="padding:0 .5rem">{{ obj.filename }}</legend>
+      <div class="form-group">
+        <label>Decision</label>
+        <select name="obj_{{ obj.id }}_decision">
+          <option value="approved">Approve</option>
+          <option value="changes_requested">Changes Requested</option>
+          <option value="rejected">Reject</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Feedback</label>
+        <textarea name="obj_{{ obj.id }}_feedback" placeholder="Optional feedback for this object"></textarea>
+      </div>
+    </fieldset>
+    {% endif %}
+    {% endfor %}
+
+    <div class="form-group">
+      <label for="summary">Summary</label>
+      <textarea name="summary" id="summary" placeholder="Overall review summary"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Submit Review</button>
+  </form>
+</div>
+{% endblock %}

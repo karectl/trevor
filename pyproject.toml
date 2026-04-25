@@ -20,6 +20,8 @@ dependencies = [
     "pygments>=2.20.0",
     "pydantic-settings>=2.13.1",
     "pydantic-ai>=0.2.0",
+    "sse-starlette>=3.3.4",
+    "datastar-py>=1.0.0",
 ]
 
 [project.scripts]

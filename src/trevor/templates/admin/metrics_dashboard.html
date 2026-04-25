@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Metrics — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Pipeline Metrics</h1>
+</div>
+
+<div class="metric-grid">
+  <div class="card metric-card">
+    <div class="value">{{ metrics.total_requests|default(0) }}</div>
+    <div class="label">Total Requests</div>
+  </div>
+  <div class="card metric-card">
+    <div class="value">{{ "%.0f"|format((metrics.approval_rate or 0) * 100) }}%</div>
+    <div class="label">Approval Rate</div>
+  </div>
+  <div class="card metric-card">
+    <div class="value">{{ "%.1f"|format(metrics.median_review_hours or 0) }}h</div>
+    <div class="label">Median Review Time</div>
+  </div>
+  <div class="card metric-card">
+    <div class="value">{{ "%.0f"|format((metrics.rejection_rate or 0) * 100) }}%</div>
+    <div class="label">Rejection Rate</div>
+  </div>
+</div>
+
+{% if metrics.by_status %}
+<div class="card mb-2">
+  <h3 style="font-size:.9rem;margin-bottom:.5rem">By Status</h3>
+  <table>
+    <thead><tr><th>Status</th><th>Count</th></tr></thead>
+    <tbody>
+      {% for s, c in metrics.by_status.items() %}
+      <tr>
+        <td><span class="badge badge-{{ s }}">{{ s|replace("_", " ") }}</span></td>
+        <td>{{ c }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if metrics.stuck_requests %}
+<div class="card">
+  <h3 style="font-size:.9rem;margin-bottom:.5rem;color:var(--status-rejected)">Stuck Requests (>{{ stuck_hours }}h)</h3>
+  <table>
+    <thead><tr><th>Title</th><th>Status</th><th>Age</th></tr></thead>
+    <tbody>
+      {% for req in metrics.stuck_requests %}
+      <tr>
+        <td><a href="/ui/requests/{{ req.id }}">{{ req.title }}</a></td>
+        <td><span class="badge badge-{{ req.status }}">{{ req.status|replace("_", " ") }}</span></td>
+        <td class="text-muted text-sm">{{ req.age_hours|default('?') }}h</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

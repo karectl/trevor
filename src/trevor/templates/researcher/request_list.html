@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}My Requests — trevor{% endblock %}
+{% block content %}
+<div class="page-header flex justify-between align-center">
+  <div>
+    <h1>My Requests</h1>
+    <p>Airlock requests across your projects</p>
+  </div>
+  <a href="/ui/requests/new" class="btn btn-primary">New Request</a>
+</div>
+
+<div class="filter-bar">
+  <div class="form-group">
+    <label>Status</label>
+    <select onchange="window.location='/ui/requests?status='+this.value+'&project_id={{ project_id|default('') }}'">
+      <option value="">All</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if projects|length > 1 %}
+  <div class="form-group">
+    <label>Project</label>
+    <select onchange="window.location='/ui/requests?project_id='+this.value+'&status={{ status_filter|default('') }}'">
+      <option value="">All projects</option>
+      {% for p in projects %}
+      <option value="{{ p.id }}" {% if project_id == p.id|string %}selected{% endif %}>{{ p.display_name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+</div>
+
+{% if requests %}
+<div class="card">
+<table>
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Status</th>
+      <th>Objects</th>
+      <th>Updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for req in requests %}
+    <tr>
+      <td><a href="/ui/requests/{{ req.id }}">{{ req.title }}</a></td>
+      <td><span class="badge badge-{{ req.status }}">{{ req.status|replace("_", " ") }}</span></td>
+      <td>{{ req.object_count|default(0) }}</td>
+      <td class="text-muted text-sm">{{ req.updated_at.strftime('%Y-%m-%d %H:%M') if req.updated_at else '-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>No requests yet.</p>
+  <a href="/ui/requests/new" class="btn btn-primary mt-2">Create your first request</a>
+</div>
+{% endif %}
+{% endblock %}

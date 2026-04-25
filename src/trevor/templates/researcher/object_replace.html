@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Replace Object — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Replace Object</h1>
+  <p>Upload a replacement for <strong>{{ object.filename }}</strong> (v{{ object.version }})</p>
+</div>
+
+<div class="card">
+  <form method="post" action="/ui/requests/{{ request_id }}/objects/{{ object.id }}/replace" enctype="multipart/form-data">
+    <div class="form-group">
+      <label for="file">Replacement File</label>
+      <input type="file" name="file" id="file" required>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="output_type">Output Type</label>
+        <select name="output_type" id="output_type" required>
+          <option value="tabular" {% if object.output_type == 'tabular' %}selected{% endif %}>Tabular</option>
+          <option value="figure" {% if object.output_type == 'figure' %}selected{% endif %}>Figure</option>
+          <option value="code" {% if object.output_type == 'code' %}selected{% endif %}>Code</option>
+          <option value="report" {% if object.output_type == 'report' %}selected{% endif %}>Report</option>
+          <option value="model" {% if object.output_type == 'model' %}selected{% endif %}>Model</option>
+          <option value="other" {% if object.output_type == 'other' %}selected{% endif %}>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="statbarn">Statbarn category</label>
+        <input type="text" name="statbarn" id="statbarn" value="{{ object.statbarn }}">
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Upload Replacement</button>
+  </form>
+</div>
+{% endblock %}

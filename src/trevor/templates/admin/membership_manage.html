@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Memberships — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Manage Memberships</h1>
+  <p>{{ project.display_name }}</p>
+</div>
+
+{# Add membership form #}
+<div class="card mb-2">
+  <h3 style="font-size:.9rem;margin-bottom:.5rem">Add Member</h3>
+  <form method="post" action="/ui/admin/memberships">
+    <input type="hidden" name="project_id" value="{{ project.id }}">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="user_id">User</label>
+        <select name="user_id" id="user_id" required>
+          {% for u in users %}
+          <option value="{{ u.id }}">{{ u.display_name }} ({{ u.email }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select name="role" id="role" required>
+          <option value="researcher">Researcher</option>
+          <option value="output_checker">Output Checker</option>
+          <option value="senior_checker">Senior Checker</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Member</button>
+  </form>
+  {% if error_message %}
+  <div class="flash flash-error mt-1">{{ error_message }}</div>
+  {% endif %}
+</div>
+
+{# Current memberships #}
+{% if memberships %}
+<div class="card">
+<table>
+  <thead>
+    <tr>
+      <th>User</th>
+      <th>Role</th>
+      <th>Assigned</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in memberships %}
+    <tr>
+      <td>{{ m.user_name|default(m.user_id) }}</td>
+      <td><span class="badge badge-{{ m.role|upper }}">{{ m.role }}</span></td>
+      <td class="text-muted text-sm">{{ m.assigned_at.strftime('%Y-%m-%d') if m.assigned_at else '-' }}</td>
+      <td>
+        <form method="post" action="/ui/admin/memberships/{{ m.id }}/delete" style="display:inline">
+          <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state"><p>No memberships for this project.</p></div>
+{% endif %}
+{% endblock %}

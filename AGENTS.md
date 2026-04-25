@@ -98,6 +98,15 @@ src/trevor/
     reviews.py             # GET /requests/{id}/reviews
     releases.py            # POST/GET /requests/{id}/release
     admin.py               # GET /admin/requests, /metrics, /audit, /audit/export
+    ui.py                  # Datastar HTML views: researcher, checker, admin
+  templates/
+    base.html              # Shell: head, nav, Datastar CDN, flash area
+    components/            # nav, flash, pagination, status_badge, file_preview
+    researcher/            # request_list, request_create, request_detail, object_upload, object_metadata, object_replace, revision_feedback
+    checker/               # review_queue, review_form
+    admin/                 # request_overview, metrics_dashboard, audit_log, membership_manage
+  static/
+    style.css              # Minimal CSS (system fonts, custom properties, status colors)
 tests/
   conftest.py              # fixtures: in-memory SQLite, client, admin_client, sample data
   test_health.py
@@ -109,6 +118,7 @@ tests/
   test_reviews.py          # agent review job + review endpoint tests
   test_releases.py         # release endpoint + RO-Crate tests
   test_admin.py            # admin dashboard + metrics endpoint tests
+  test_ui.py               # Datastar UI route tests
 alembic/                   # async Alembic config, migrations
 helm/trevor/               # Helm chart skeleton
 .github/workflows/ci.yml   # lint → test → docker build
@@ -235,6 +245,24 @@ Agent settings (planned):
 | `GET` | `/admin/metrics` | Admin/Senior | Pipeline metrics + stuck detection |
 | `GET` | `/admin/audit` | `tre_admin` | Filterable audit log |
 | `GET` | `/admin/audit/export` | `tre_admin` | Export audit log as CSV |
+| `GET` | `/ui/requests` | Any | Researcher request list (HTML) |
+| `GET` | `/ui/requests/new` | Any | Create request form (HTML) |
+| `POST` | `/ui/requests` | Researcher | Create request via form |
+| `GET` | `/ui/requests/{id}` | Member/Admin | Request detail (HTML) |
+| `GET/POST` | `/ui/requests/{id}/upload` | Researcher | Upload object form + handler |
+| `GET/POST` | `/ui/requests/{id}/objects/{oid}/metadata` | Researcher | Metadata form + handler |
+| `GET/POST` | `/ui/requests/{id}/objects/{oid}/replace` | Researcher | Replace form + handler |
+| `POST` | `/ui/requests/{id}/submit` | Owner/Admin | Submit via UI |
+| `POST` | `/ui/requests/{id}/resubmit` | Owner/Admin | Resubmit via UI |
+| `POST` | `/ui/requests/{id}/release` | `tre_admin` | Release via UI |
+| `GET` | `/ui/review` | Checker/Admin | Review queue (HTML) |
+| `GET/POST` | `/ui/review/{id}` | Checker/Admin | Review form + submit |
+| `GET` | `/ui/admin` | `tre_admin` | Admin request overview (HTML) |
+| `GET` | `/ui/admin/metrics` | `tre_admin` | Metrics dashboard (HTML) |
+| `GET` | `/ui/admin/audit` | `tre_admin` | Audit log (HTML) |
+| `GET` | `/ui/admin/memberships/{pid}` | `tre_admin` | Membership management (HTML) |
+| `POST` | `/ui/admin/memberships` | `tre_admin` | Create membership via UI |
+| `POST` | `/ui/admin/memberships/{mid}/delete` | `tre_admin` | Delete membership via UI |
 
 ---
 

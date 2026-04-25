@@ -1,0 +1,13 @@
+<div class="preview-panel" id="preview-{{ object_id }}">
+  {% if preview_type == "html_table" %}
+  {{ preview_content|safe }}
+  {% elif preview_type == "markdown" %}
+  {{ preview_content|safe }}
+  {% elif preview_type == "code" %}
+  {{ preview_content|safe }}
+  {% elif preview_type == "image" %}
+  <img src="{{ preview_url }}" alt="{{ filename }}" style="max-width:100%;max-height:400px;">
+  {% else %}
+  <pre>{{ preview_content }}</pre>
+  {% endif %}
+</div>

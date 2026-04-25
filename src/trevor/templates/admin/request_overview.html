@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Admin — Requests — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>All Requests</h1>
+  <p>Cross-project request overview</p>
+</div>
+
+<div class="filter-bar">
+  <div class="form-group">
+    <label>Status</label>
+    <select onchange="window.location='/ui/admin?status='+this.value">
+      <option value="">All</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+{% if requests %}
+<div class="card">
+<table>
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Project</th>
+      <th>Status</th>
+      <th>Submitter</th>
+      <th>Updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for req in requests %}
+    <tr>
+      <td><a href="/ui/requests/{{ req.id }}">{{ req.title }}</a></td>
+      <td class="text-muted text-sm">{{ req.project_id }}</td>
+      <td><span class="badge badge-{{ req.status }}">{{ req.status|replace("_", " ") }}</span></td>
+      <td class="text-muted text-sm">{{ req.submitted_by }}</td>
+      <td class="text-muted text-sm">{{ req.updated_at.strftime('%Y-%m-%d %H:%M') if req.updated_at else '-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state"><p>No requests found.</p></div>
+{% endif %}
+{% endblock %}

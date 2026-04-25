@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}New Request — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Create Request</h1>
+  <p>Create a new airlock request for output release</p>
+</div>
+
+<div class="card">
+  <form method="post" action="/ui/requests">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="project_id">Project</label>
+        <select name="project_id" id="project_id" required>
+          {% for p in projects %}
+          <option value="{{ p.id }}">{{ p.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="direction">Direction</label>
+        <select name="direction" id="direction">
+          <option value="egress" selected>Egress</option>
+          <option value="ingress">Ingress</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input type="text" name="title" id="title" required placeholder="Brief description of outputs">
+    </div>
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea name="description" id="description" placeholder="What these outputs contain and why they need release"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Create Request</button>
+  </form>
+</div>
+{% endblock %}

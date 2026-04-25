@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Metadata — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Object Metadata</h1>
+  <p>{{ object.filename }} (v{{ object.version }})</p>
+</div>
+
+<div class="card">
+  <form method="post" action="/ui/requests/{{ request_id }}/objects/{{ object.id }}/metadata">
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea name="description" id="description">{{ metadata.description }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="researcher_justification">Researcher Justification</label>
+      <textarea name="researcher_justification" id="researcher_justification">{{ metadata.researcher_justification }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="suppression_notes">Suppression Notes</label>
+      <textarea name="suppression_notes" id="suppression_notes">{{ metadata.suppression_notes }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Save Metadata</button>
+  </form>
+</div>
+{% endblock %}

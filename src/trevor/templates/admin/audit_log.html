@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Audit Log — trevor{% endblock %}
+{% block content %}
+<div class="page-header flex justify-between align-center">
+  <div>
+    <h1>Audit Log</h1>
+  </div>
+  <a href="/admin/audit/export" class="btn btn-sm">Export CSV</a>
+</div>
+
+<div class="filter-bar">
+  <div class="form-group">
+    <label>Event Type</label>
+    <input type="text" name="event_type" placeholder="e.g. request." value="{{ event_type_filter|default('') }}"
+           onchange="window.location='/ui/admin/audit?event_type='+this.value">
+  </div>
+</div>
+
+{% if events %}
+<div class="card">
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Event</th>
+      <th>Actor</th>
+      <th>Request</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ev in events %}
+    <tr>
+      <td class="text-sm">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') if ev.timestamp else '' }}</td>
+      <td>{{ ev.event_type }}</td>
+      <td class="text-muted text-sm">{{ ev.actor_id }}</td>
+      <td>
+        {% if ev.request_id %}
+        <a href="/ui/requests/{{ ev.request_id }}" class="text-sm">{{ ev.request_id|string|truncate(8, True, '') }}</a>
+        {% else %}-{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state"><p>No audit events found.</p></div>
+{% endif %}
+
+{% include 'components/pagination.html' %}
+{% endblock %}

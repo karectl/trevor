@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Checker Feedback — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Revision Feedback</h1>
+  <p>Feedback on <a href="/ui/requests/{{ airlock_request.id }}">{{ airlock_request.title }}</a></p>
+</div>
+
+{% for rev in reviews %}
+<div class="card">
+  <div class="flex justify-between align-center mb-1">
+    <strong>{{ rev.reviewer_type|title }} Review</strong>
+    <span class="badge badge-{{ rev.decision|upper }}">{{ rev.decision }}</span>
+  </div>
+  {% if rev.summary %}<p>{{ rev.summary }}</p>{% endif %}
+  {% if rev.findings %}
+  <ul class="text-sm mt-1">
+    {% for f in rev.findings %}<li>{{ f }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endfor %}
+
+<div class="mt-2">
+  <a href="/ui/requests/{{ airlock_request.id }}" class="btn">Back to Request</a>
+</div>
+{% endblock %}
