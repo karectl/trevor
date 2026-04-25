@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     agent_min_cell_count: int = 10
     agent_dominance_p: int = 70
 
+    # Release
+    presigned_url_ttl: int = 604800  # 7 days
+
     # App
     app_title: str = "trevor"
     app_version: str = "0.1.0"

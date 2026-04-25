@@ -159,6 +159,26 @@ async def agent_review_job(ctx: dict[str, Any], request_id: str) -> None:
             raise
 
 
+async def release_job(ctx: dict[str, Any], request_id: str) -> None:
+    """Assemble RO-Crate and release an approved request."""
+    from trevor.services.release_service import assemble_and_release
+
+    session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
+    settings: Settings = ctx["settings"]
+
+    import uuid
+
+    req_uuid = uuid.UUID(request_id)
+
+    async with session_factory() as session:
+        try:
+            await assemble_and_release(req_uuid, session, settings)
+            logger.info("release_job: completed for request %s", request_id)
+        except Exception:
+            logger.exception("release_job: failed for request %s", request_id)
+            raise
+
+
 async def url_expiry_warning_job(ctx: dict[str, Any]) -> None:
     """Cron — check for ReleaseRecords with pre-signed URLs expiring soon.
 
@@ -195,7 +215,7 @@ class WorkerSettings:
     settings = get_settings()
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
 
-    functions = [agent_review_job]
+    functions = [agent_review_job, release_job]
     cron_jobs = [
         cron(url_expiry_warning_job, hour={0}, minute=0, run_at_startup=False),
     ]

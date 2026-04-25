@@ -1,6 +1,7 @@
 """trevor domain models."""
 
 from trevor.models.project import Project, ProjectMembership, ProjectRole, ProjectStatus
+from trevor.models.release import ReleaseRecord
 from trevor.models.request import (
     AirlockDirection,
     AirlockRequest,
@@ -27,6 +28,7 @@ __all__ = [
     "ProjectMembership",
     "ProjectRole",
     "ProjectStatus",
+    "ReleaseRecord",
     "Review",
     "ReviewDecision",
     "ReviewerType",
