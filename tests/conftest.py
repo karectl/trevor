@@ -116,3 +116,34 @@ async def sample_membership(db_session, sample_user, sample_project) -> ProjectM
     await db_session.commit()
     await db_session.refresh(membership)
     return membership
+
+
+@pytest.fixture
+async def researcher_setup(client, admin_client, db_session):
+    """Upsert dev-bypass user, create project, assign researcher role.
+
+    Returns (client, project_id) where client is authenticated as the researcher.
+    """
+    # Trigger user upsert for dev-bypass-user
+    me = await client.get("/users/me")
+    assert me.status_code == 200
+    user_id = me.json()["id"]
+
+    # Create project directly in DB
+    project = Project(crd_name="req-test-project", display_name="Request Test Project")
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+
+    # Assign researcher membership via admin endpoint
+    r = await admin_client.post(
+        "/memberships",
+        json={
+            "user_id": user_id,
+            "project_id": str(project.id),
+            "role": "researcher",
+        },
+    )
+    assert r.status_code == 201
+
+    return client, project.id

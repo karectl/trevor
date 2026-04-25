@@ -32,11 +32,12 @@ from trevor.schemas.request import (
     RequestReadWithObjects,
 )
 from trevor.services import audit_service
-from trevor.settings import get_settings
+from trevor.settings import Settings, get_settings
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 async def _get_request_or_404(request_id: uuid.UUID, session: AsyncSession) -> AirlockRequest:
@@ -188,6 +189,7 @@ async def upload_object(
     request_id: uuid.UUID,
     auth: CurrentAuth,
     session: Session,
+    settings: SettingsDep,
     file: UploadFile,
     output_type: Annotated[OutputType, Form()],
     statbarn: Annotated[str, Form()] = "",
@@ -208,7 +210,6 @@ async def upload_object(
         f"{req.project_id}/{req.id}/{logical_object_id}/{version}/{object_id}-{file.filename}"
     )
 
-    settings = get_settings()
     if not settings.dev_auth_bypass:
         from trevor.storage import upload_fileobj
 
