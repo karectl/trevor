@@ -372,3 +372,75 @@ async def test_review_form_signals_attribute(admin_client: AsyncClient, db_sessi
     html = r.text
     assert "data-signals" in html
     assert "data-store=" not in html
+
+
+# ---------------------------------------------------------------------------
+# Object delete endpoint + confirm-delete modal
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_object_delete_removes_object(researcher_setup) -> None:
+    """DELETE an object from a DRAFT request — it should disappear from the nav."""
+    client, project_id = researcher_setup
+    req_id, obj_id = await _create_request_and_upload(client, project_id, filename="todelete.csv")
+
+    r = await client.post(
+        f"/ui/requests/{req_id}/objects/{obj_id}/delete",
+        data={},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    assert "todelete.csv" not in r.text
+
+
+@pytest.mark.anyio
+async def test_object_delete_rejected_when_not_draft(researcher_setup) -> None:
+    """DELETE endpoint returns 409 if the request is not in DRAFT state."""
+
+    client, project_id = researcher_setup
+    req_id, obj_id = await _create_request_and_upload(client, project_id)
+
+    # Advance request to SUBMITTED via the JSON API (requires a session)
+    # Easiest: directly patch via the test session via conftest db_session is not available here.
+    # Use submit endpoint instead.
+    r_submit = await client.post(
+        f"/ui/requests/{req_id}/submit",
+        data={},
+        follow_redirects=False,
+    )
+    # submit redirects to detail; status now SUBMITTED or AGENT_REVIEW
+    assert r_submit.status_code in (303, 200)
+
+    r = await client.post(
+        f"/ui/requests/{req_id}/objects/{obj_id}/delete",
+        data={},
+        follow_redirects=False,
+    )
+    assert r.status_code == 409
+
+
+@pytest.mark.anyio
+async def test_detail_page_has_delete_modal_signals(researcher_setup) -> None:
+    """Detail page must include deleteObjId/deleteObjName signals for the confirm modal."""
+    client, project_id = researcher_setup
+    req_id, _ = await _create_request_and_upload(client, project_id)
+
+    r = await client.get(f"/ui/requests/{req_id}")
+    assert r.status_code == 200
+    html = r.text
+    assert "deleteObjId" in html
+    assert "deleteObjName" in html
+    assert "modal-overlay" in html
+
+
+@pytest.mark.anyio
+async def test_detail_page_nav_has_delete_button(researcher_setup) -> None:
+    """Nav item for a DRAFT object should have a delete (trash) button."""
+    client, project_id = researcher_setup
+    req_id, _ = await _create_request_and_upload(client, project_id, filename="nav_del.csv")
+
+    r = await client.get(f"/ui/requests/{req_id}")
+    assert r.status_code == 200
+    html = r.text
+    assert "Delete object" in html or "🗑" in html

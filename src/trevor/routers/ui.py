@@ -482,6 +482,49 @@ async def object_replace(
     return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
 
 
+@router.post(
+    "/requests/{request_id}/objects/{object_id}/delete",
+    response_class=HTMLResponse,
+)
+async def object_delete(
+    request: Request,
+    request_id: uuid.UUID,
+    object_id: uuid.UUID,
+    auth: CurrentAuth,
+    session: Session,
+) -> RedirectResponse:
+    """Delete an output object from a DRAFT request."""
+    req = await session.get(AirlockRequest, request_id)
+    if not req or req.status != AirlockRequestStatus.DRAFT:
+        raise HTTPException(status_code=409, detail="Request not in DRAFT state")
+    obj = await session.get(OutputObject, object_id)
+    if not obj or obj.request_id != request_id:
+        raise HTTPException(status_code=404)
+
+    # Delete associated metadata if no other object versions reference this logical object
+    other_versions = await session.exec(
+        select(OutputObject).where(
+            OutputObject.logical_object_id == obj.logical_object_id,
+            OutputObject.id != object_id,
+        )
+    )
+    if not list(other_versions.all()):
+        meta = await session.get(OutputObjectMetadata, obj.logical_object_id)
+        if meta:
+            await session.delete(meta)
+
+    await audit_service.emit(
+        session,
+        event_type="object.deleted",
+        actor_id=str(auth.user.id),
+        request_id=request_id,
+        payload={"object_id": str(object_id), "filename": obj.filename},
+    )
+    await session.delete(obj)
+    await session.commit()
+    return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
+
+
 @router.post("/requests/{request_id}/submit", response_class=HTMLResponse)
 async def request_submit(
     request: Request,

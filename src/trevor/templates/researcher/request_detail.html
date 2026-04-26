@@ -45,7 +45,27 @@
 </div>
 
 {# Main tabs #}
-<div data-signals="{mainTab: 'objects', objIdx: 0, showUpload: false, showMeta: -1}">
+<div data-signals="{mainTab: 'objects', objIdx: 0, showUpload: false, showMeta: -1, deleteObjId: '', deleteObjName: ''}">
+
+{# ── Confirm-delete modal ── #}
+<div class="modal-overlay" data-show="deleteObjId.value !== ''">
+  <div class="modal-box">
+    <h3>Delete object?</h3>
+    <p>
+      <strong data-text="deleteObjName.value"></strong> will be permanently removed from this
+      request. This cannot be undone.
+    </p>
+    <div class="modal-actions">
+      <button type="button" class="btn"
+              data-on-click="deleteObjId.value = ''; deleteObjName.value = ''">Cancel</button>
+      <form method="post" style="display:inline"
+            data-bind-action="'/ui/requests/{{ airlock_request.id }}/objects/' + deleteObjId.value + '/delete'">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+</div>
   <div class="tabs">
     <span class="tab" data-class-active="mainTab.value === 'objects'"
           data-on-click="mainTab.value = 'objects'" style="cursor:pointer">
@@ -74,27 +94,11 @@
         </div>
         <div class="ws-nav-list">
           {% for obj in objects %}
-          {%- set ext = obj.filename.rsplit('.', 1)[-1].lower() if '.' in obj.filename else '' -%}
-          {%- set ft_map = {
-            'csv':'tabular','tsv':'tabular','tab':'tabular','parquet':'tabular','xlsx':'tabular',
-            'png':'figure','jpg':'figure','jpeg':'figure','gif':'figure','svg':'figure','pdf':'figure',
-            'py':'code','r':'code','js':'code','sh':'code','sql':'code',
-            'md':'report','txt':'report','docx':'report',
-            'pkl':'model','pt':'model','h5':'model','onnx':'model','joblib':'model'
-          } -%}
-          {%- set ft = ft_map.get(ext, obj.output_type) -%}
-          {%- set ft_labels = {'tabular':'CSV','figure':'IMG','code':'CODE','report':'DOC','model':'MDL','other':'OTH'} -%}
-          {%- set ft_label = ft_labels.get(ft, ext[:3].upper() or '?') -%}
-          <div class="ws-nav-item"
-               data-class-ws-nav-active="objIdx.value === {{ loop.index0 }}"
-               data-on-click="objIdx.value = {{ loop.index0 }}; showUpload.value = false; showMeta.value = -1">
-            <span class="ft-icon ft-{{ ft }}">{{ ft_label }}</span>
-            <div class="ws-nav-item-info">
-              <div class="ws-nav-item-name" title="{{ obj.filename }}">{{ obj.filename }}</div>
-              <div class="ws-nav-item-meta">v{{ obj.version }} &middot; {{ obj.output_type }}</div>
-            </div>
-            <span class="obj-state-dot dot-{{ obj.state }}"></span>
-          </div>
+          {% set index = loop.index0 %}
+          {% set selected_signal = 'objIdx' %}
+          {% set can_edit = airlock_request.status.value == "DRAFT" %}
+          {% set can_delete = airlock_request.status.value == "DRAFT" %}
+          {% include 'components/object_nav_item.html' %}
           {% endfor %}
 
           {% if not objects %}

@@ -1,6 +1,7 @@
 {# components/object_nav_item.html
    Renders one row in the left object nav panel.
-   Expects: obj, index, selected_signal (datastar signal name)
+   Expects: obj, index, selected_signal (datastar signal name),
+            can_edit (bool), can_delete (bool)
 #}
 {% set ext = obj.filename.rsplit('.', 1)[-1].lower() if '.' in obj.filename else '' %}
 {% set ft_map = {
@@ -17,11 +18,27 @@
 {% set ft_label = ft_label_map.get(ft, ext[:3].upper() or '?') %}
 <div class="ws-nav-item{% if index == 0 %} ws-nav-active{% endif %}"
      data-class-ws-nav-active="{{ selected_signal }}.value === {{ index }}"
-     data-on-click="{{ selected_signal }}.value = {{ index }}">
+     data-on-click="{{ selected_signal }}.value = {{ index }}; showUpload.value = false; showMeta.value = -1">
   <span class="ft-icon ft-{{ ft }}">{{ ft_label }}</span>
   <div class="ws-nav-item-info">
     <div class="ws-nav-item-name" title="{{ obj.filename }}">{{ obj.filename }}</div>
     <div class="ws-nav-item-meta">v{{ obj.version }} &middot; {{ obj.output_type }}</div>
   </div>
   <span class="obj-state-dot dot-{{ obj.state }}"></span>
+  {% if can_edit or can_delete %}
+  <div class="ws-nav-item-actions">
+    {% if can_edit %}
+    <button type="button" title="Edit metadata"
+            data-on-click.stop="{{ selected_signal }}.value = {{ index }}; showUpload.value = false; showMeta.value = showMeta.value === {{ index }} ? -1 : {{ index }}">
+      ✏️
+    </button>
+    {% endif %}
+    {% if can_delete %}
+    <button type="button" class="btn-danger" title="Delete object"
+            data-on-click.stop="deleteObjId.value = '{{ obj.id }}'; deleteObjName.value = '{{ obj.filename|replace("'", "\\'") }}'">
+      🗑️
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
