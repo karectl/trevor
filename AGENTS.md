@@ -79,8 +79,10 @@ src/trevor/
     deliveries.py    # /requests/{id}/deliver + /delivery (ingress)
     notifications.py # /notifications — list, unread-count, mark-read, mark-all-read
     admin.py         # /admin — requests, metrics, audit, audit/export
+    sse.py           # /ui/sse — SSE live update streams (status badge, queue count, notification count)
     ui.py            # /ui — all Datastar HTML views
     users.py projects.py memberships.py auth_routes.py
+  sse.py              # SSE helpers: format_fragment_event, sse_stream, sse_response
   templates/
     base.html         # shell + nav (bell badge) + Datastar CDN
     components/       # nav, flash, pagination, status_badge, file_preview
@@ -91,7 +93,7 @@ src/trevor/
   static/style.css    # custom properties, status colours, notification styles
 tests/
   conftest.py         # in-memory SQLite, client/admin_client fixtures, DEV_AUTH_BYPASS
-  test_*.py           # 220 tests across 15 files
+  test_*.py           # 230 tests across 16 files
 alembic/versions/     # async migrations
 deploy/dev/
   crds/               # CRD schemas (Project, User, Group, KeycloakClient, VDI)
@@ -234,6 +236,14 @@ Checker: `/review`, `/review/{id}`
 Admin: `/admin`, `/admin/metrics`, `/admin/audit`, `/admin/memberships/{pid}`, `/ingress/new`, `/requests/ingress`, `/requests/{id}/ingress-upload`, `…/objects/{oid}/generate-url`, `…/confirm`, `/requests/{id}/deliver`, `/requests/{id}/release`
 
 All roles: `/notifications`, `/notifications/{id}/read`, `/notifications/mark-all-read`
+
+**SSE streams (all under `/ui/sse/`)**
+
+| Endpoint | Auth | Fragment ID |
+|---|---|---|
+| `GET /ui/sse/requests/{id}/status` | Member | `request-status-badge` |
+| `GET /ui/sse/review/queue-count` | Checker/Admin | `review-queue-count` |
+| `GET /ui/sse/notifications/count` | Any | `notification-count` |
 
 ---
 

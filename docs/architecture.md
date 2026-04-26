@@ -87,6 +87,24 @@ On every authenticated request, `upsert_user()` creates or updates a User shadow
 
 Recipient resolution: checker events (`request.submitted`, `agent_review.ready`) go to all output_checker / senior_checker members of the project; researcher events (`request.approved`, `request.released`, etc.) go to the submitter.
 
+### SSE live updates
+
+`sse.py` provides three Datastar-compatible SSE helpers:
+
+- **`format_fragment_event`** — wraps an HTML string as a `datastar-merge-fragments` SSE event; multi-line HTML is split across multiple `data:` lines
+- **`sse_stream`** — async generator that polls a `poll_fn` every 2 seconds for up to 5 minutes, yielding only when the HTML fragment changes (delta suppression)
+- **`sse_response`** — wraps an async generator as a `StreamingResponse` with `text/event-stream` content type
+
+`routers/sse.py` exposes three endpoints, all under `/ui/sse/`:
+
+| Endpoint | Fragment ID | Description |
+|---|---|---|
+| `GET /ui/sse/requests/{id}/status` | `request-status-badge` | Live status badge for a single request |
+| `GET /ui/sse/review/queue-count` | `review-queue-count` | Live count of reviewable requests (checkers only) |
+| `GET /ui/sse/notifications/count` | `notification-count` | Live unread notification count (nav badge) |
+
+Each endpoint uses `get_sse_session_factory` (a FastAPI dep, overridable in tests) so the poll loop uses the same DB engine as the rest of the test session.
+
 ### CRD sync
 
 `crd_sync_service.py` reconciles CR8TOR CRDs into the postgres DB every 5 minutes (ARQ cron, `run_at_startup=True`):
@@ -133,21 +151,23 @@ src/trevor/
     notification_service.py  # NotificationEvent, InAppBackend, SmtpBackend, NotificationRouter, get_router
     email_templates/         # 7 event dirs (subject.txt, body.html, body.txt) for SmtpBackend
     crd_sync_service.py    # CRD reconcile logic (projects, users, researcher memberships)
-  routers/
-    users.py               # /users/me
-    projects.py            # /projects
-    memberships.py         # /memberships
-    requests.py            # /requests (CRUD + submit + upload)
-    reviews.py             # /requests/{id}/reviews
-    releases.py            # /requests/{id}/release
-    notifications.py       # /notifications (list, unread-count, mark-read)
-    admin.py               # /admin (requests, metrics, audit)
-    ui.py                  # /ui (Datastar HTML views, including /ui/notifications)
-  templates/               # Jinja2 templates for Datastar UI
-  static/                  # CSS (no JS build step)
+   routers/
+     users.py               # /users/me
+     projects.py            # /projects
+     memberships.py         # /memberships
+     requests.py            # /requests (CRUD + submit + upload)
+     reviews.py             # /requests/{id}/reviews
+     releases.py            # /requests/{id}/release
+     notifications.py       # /notifications (list, unread-count, mark-read)
+     admin.py               # /admin (requests, metrics, audit)
+     sse.py                 # /ui/sse (SSE live update streams)
+     ui.py                  # /ui (Datastar HTML views, including /ui/notifications)
+   sse.py                   # SSE helpers: format_fragment_event, sse_stream, sse_response
+   templates/               # Jinja2 templates for Datastar UI
+   static/                  # CSS (no JS build step)
 tests/
   conftest.py              # fixtures: in-memory SQLite, clients, sample data
-  test_*.py                # 220 tests across 15 test files
+  test_*.py                # 230 tests across 16 test files
 alembic/                   # async Alembic config + migrations
 docs/                      # this documentation (zensical)
 helm/trevor/               # Helm chart skeleton

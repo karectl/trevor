@@ -2,8 +2,13 @@
   <span class="brand">trevor</span>
   <div class="nav-links">
     <a href="/ui/requests">Requests</a>
-    {% if is_checker %}
-    <a href="/ui/review">Review Queue</a>
+    {% if is_checker or is_admin %}
+    <a href="/ui/review" class="nav-link-with-badge">
+      Review Queue
+      <span data-on-load="@get('/ui/sse/review/queue-count')">
+        <span id="review-queue-count" class="badge badge-count"></span>
+      </span>
+    </a>
     {% endif %}
     {% if is_admin %}
     <a href="/ui/admin">Admin</a>
@@ -13,21 +18,12 @@
   </div>
   <span class="spacer"></span>
   <span class="user-info">
-    <span
-      id="notif-badge-wrap"
-      data-on-load="$$get('/notifications/unread-count')"
-      data-on-interval__1000ms="$$get('/notifications/unread-count')"
-    >
-      <a href="/ui/notifications" class="notif-bell" aria-label="Notifications">
-        🔔
-        <span
-          id="notif-count"
-          class="notif-badge"
-          data-show="$count > 0"
-          data-text="$count"
-        ></span>
-      </a>
-    </span>
+    <a href="/ui/notifications" class="notif-bell nav-link-with-badge" aria-label="Notifications">
+      🔔
+      <span data-on-load="@get('/ui/sse/notifications/count')">
+        <span id="notification-count" class="badge badge-notify"></span>
+      </span>
+    </a>
     {{ user.display_name }}
     {% if is_admin %}<span class="badge badge-APPROVED">admin</span>{% endif %}
     <a href="/auth/logout" class="logout-link">Log out</a>

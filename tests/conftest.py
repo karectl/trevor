@@ -10,6 +10,7 @@ from trevor.app import create_app
 from trevor.database import get_session
 from trevor.models.project import Project, ProjectMembership, ProjectRole
 from trevor.models.user import User
+from trevor.routers.sse import get_sse_session_factory
 from trevor.settings import Settings, get_settings
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
@@ -51,6 +52,7 @@ async def client(dev_settings, engine):
     app = create_app(dev_settings)
     app.dependency_overrides[get_session] = _override_get_session
     app.dependency_overrides[get_settings] = lambda: dev_settings
+    app.dependency_overrides[get_sse_session_factory] = lambda: factory
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
@@ -68,6 +70,7 @@ async def admin_client(dev_settings, engine):
     app = create_app(dev_settings)
     app.dependency_overrides[get_session] = _override_get_session
     app.dependency_overrides[get_settings] = lambda: dev_settings
+    app.dependency_overrides[get_sse_session_factory] = lambda: factory
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

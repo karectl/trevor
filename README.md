@@ -31,7 +31,7 @@ Researchers submit output objects (files, tables, figures) for disclosure review
 
 ```bash
 uv sync
-uv run pytest -v        # 220 tests, no external services needed
+uv run pytest -v        # 230 tests, no external services needed
 uv run trevor           # API on http://localhost:8000
 ```
 

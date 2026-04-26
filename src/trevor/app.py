@@ -28,6 +28,7 @@ from trevor.routers import (
     releases,
     requests,
     reviews,
+    sse,
     ui,
     users,
 )
@@ -175,6 +176,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(deliveries.router)
     app.include_router(notifications.router)
     app.include_router(admin.router)
+    app.include_router(sse.router)
     app.include_router(ui.router)
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 

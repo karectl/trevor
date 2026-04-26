@@ -349,3 +349,10 @@ textarea { resize: vertical; min-height: 80px; }
 .notif-body { margin: 0 0 .25rem; font-size: .9rem; }
 .notif-link { font-size: .85rem; }
 .btn-xs { font-size: .75rem; padding: 1px 6px; }
+
+/* SSE live badges (iter-16) */
+.nav-link-with-badge { position: relative; display: inline-flex; align-items: center; gap: .3rem; }
+.badge-notify { background: var(--danger, #d9534f); color: #fff; border-radius: 999px; font-size: .65rem; font-weight: 700; padding: 0 4px; min-width: 16px; text-align: center; line-height: 16px; display: inline-block; }
+.badge-notify:empty { display: none; }
+.badge-count { background: var(--primary, #0d6efd); color: #fff; border-radius: 999px; font-size: .65rem; font-weight: 700; padding: 0 4px; min-width: 16px; text-align: center; line-height: 16px; display: inline-block; }
+.badge-count:empty { display: none; }

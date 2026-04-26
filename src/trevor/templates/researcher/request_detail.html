@@ -7,8 +7,8 @@
       <h1>{{ airlock_request.title }}</h1>
       <p class="text-muted text-sm">{{ airlock_request.direction }} &middot; {{ project.display_name if project else airlock_request.project_id }}</p>
     </div>
-    <div id="status-area">
-      <span class="badge badge-{{ airlock_request.status }}">{{ airlock_request.status|replace("_", " ") }}</span>
+    <div id="status-area" data-on-load="@get('/ui/sse/requests/{{ airlock_request.id }}/status')">
+      {% set status = airlock_request.status %}{% include 'components/status_badge_sse.html' %}
     </div>
   </div>
 </div>
