@@ -191,6 +191,7 @@ class NotificationRouter:
 _CHECKER_EVENTS = {
     NotificationEventType.REQUEST_SUBMITTED,
     NotificationEventType.AGENT_REVIEW_READY,
+    NotificationEventType.REQUEST_STUCK,
 }
 
 _RESEARCHER_EVENTS = {

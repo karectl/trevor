@@ -28,6 +28,7 @@ class ReleaseRecord(SQLModel, table=True):
     crate_checksum_sha256: str
     presigned_url: str = Field(default="")
     url_expires_at: datetime | None = Field(default=None)
+    expiry_warned_at: datetime | None = Field(default=None)
     delivered_to: list[Any] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False, default=list),

@@ -52,7 +52,7 @@ src/trevor/
   database.py       # get_engine (lru_cache), get_session dep
   auth.py           # AuthContext, CurrentAuth, RequireAdmin, DEV_AUTH_BYPASS
   storage.py        # aioboto3 S3 — upload, download, presigned URLs
-  worker.py         # ARQ: agent_review_job, release_job, send_notifications_job, crd_sync_job
+  worker.py         # ARQ: agent_review_job, release_job, send_notifications_job, url_expiry_warning_job, stuck_request_alert_job, crd_sync_job
   crd.py            # kubernetes client wrappers (list CRDs)
   agent/            # rules.py (statbarn, pure), agent.py (Pydantic-AI), prompts.py, schemas.py
   models/
@@ -93,7 +93,7 @@ src/trevor/
   static/style.css    # custom properties, status colours, notification styles
 tests/
   conftest.py         # in-memory SQLite, client/admin_client fixtures, DEV_AUTH_BYPASS
-  test_*.py           # 230 tests across 16 files
+  test_*.py           # 240 tests across 17 files
 alembic/versions/     # async migrations
 deploy/dev/
   crds/               # CRD schemas (Project, User, Group, KeycloakClient, VDI)

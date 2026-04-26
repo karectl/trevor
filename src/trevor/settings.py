@@ -46,6 +46,7 @@ class Settings(BaseSettings):
 
     # Release
     presigned_url_ttl: int = 604800  # 7 days
+    url_expiry_warning_hours: int = 48  # warn this many hours before URL expires
 
     # Admin
     stuck_request_hours: int = 72

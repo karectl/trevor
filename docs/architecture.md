@@ -129,7 +129,7 @@ src/trevor/
   database.py              # async engine, session factory, get_session dep
   auth.py                  # AuthContext dep, DEV_AUTH_BYPASS, require_admin
   storage.py               # aioboto3 S3 abstraction
-  worker.py                # ARQ WorkerSettings, agent_review_job, release_job, send_notifications_job, crd_sync_job
+  worker.py                # ARQ WorkerSettings, agent_review_job, release_job, send_notifications_job, url_expiry_warning_job, stuck_request_alert_job, crd_sync_job
   agent/
     rules.py               # statbarn rule engine (9 rules, pure functions)
     agent.py               # Pydantic-AI agent orchestration + LLM narrative
@@ -167,7 +167,7 @@ src/trevor/
    static/                  # CSS (no JS build step)
 tests/
   conftest.py              # fixtures: in-memory SQLite, clients, sample data
-  test_*.py                # 230 tests across 16 test files
+  test_*.py                # 240 tests across 17 test files
 alembic/                   # async Alembic config + migrations
 docs/                      # this documentation (zensical)
 helm/trevor/               # Helm chart skeleton

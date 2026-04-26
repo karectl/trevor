@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from trevor.models.notification import NotificationEventType
 from trevor.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -232,11 +233,94 @@ async def send_notifications_job(
 
 
 async def url_expiry_warning_job(ctx: dict[str, Any]) -> None:
-    """Cron — check for ReleaseRecords with pre-signed URLs expiring soon.
+    """Cron — notify researchers about pre-signed URLs expiring within warning window."""
+    from datetime import UTC, datetime, timedelta
 
-    Iteration 6 will implement URL expiry notifications here.
-    """
-    logger.info("url_expiry_warning_job ran (stub)")
+    from sqlmodel import select
+
+    from trevor.models.release import ReleaseRecord
+    from trevor.models.request import AirlockRequest
+    from trevor.services.notification_service import NotificationRouter, create_event, get_router
+
+    settings: Settings = ctx["settings"]
+    if not settings.notifications_enabled:
+        return
+
+    session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
+    now = datetime.now(UTC).replace(tzinfo=None)
+    warn_before = now + timedelta(hours=settings.url_expiry_warning_hours)
+
+    async with session_factory() as session:
+        result = await session.exec(
+            select(ReleaseRecord).where(
+                ReleaseRecord.url_expires_at != None,  # noqa: E711
+                ReleaseRecord.url_expires_at <= warn_before,
+                ReleaseRecord.url_expires_at > now,
+                ReleaseRecord.expiry_warned_at == None,  # noqa: E711
+            )
+        )
+        records = list(result.all())
+
+    warned = 0
+    for record in records:
+        async with session_factory() as session:
+            req = await session.get(AirlockRequest, record.request_id)
+            if req is None:
+                continue
+            event = await create_event(NotificationEventType.PRESIGNED_URL_EXPIRING, req, session)
+            if event.recipient_user_ids:
+                router: NotificationRouter = ctx.get("notification_router") or get_router(settings)
+                await router.dispatch(event, session)
+            # Mark warned regardless of recipients to prevent re-dispatch
+            rec = await session.get(ReleaseRecord, record.id)
+            if rec:
+                rec.expiry_warned_at = datetime.now(UTC).replace(tzinfo=None)
+                session.add(rec)
+            await session.commit()
+            warned += 1
+
+    logger.info("url_expiry_warning_job: warned for %d release(s)", warned)
+
+
+async def stuck_request_alert_job(ctx: dict[str, Any]) -> None:
+    """Cron — alert checkers about requests stuck in review beyond SLA threshold."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlmodel import select
+
+    from trevor.models.request import AirlockRequest, AirlockRequestStatus
+    from trevor.services.notification_service import NotificationRouter, create_event, get_router
+
+    settings: Settings = ctx["settings"]
+    if not settings.notifications_enabled:
+        return
+
+    session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
+    now = datetime.now(UTC).replace(tzinfo=None)
+    threshold = now - timedelta(hours=settings.stuck_request_hours)
+
+    stuck_statuses = [AirlockRequestStatus.SUBMITTED, AirlockRequestStatus.HUMAN_REVIEW]
+
+    async with session_factory() as session:
+        result = await session.exec(
+            select(AirlockRequest).where(
+                AirlockRequest.status.in_(stuck_statuses),  # type: ignore[attr-defined]
+                AirlockRequest.updated_at <= threshold,
+            )
+        )
+        stuck = list(result.all())
+
+    alerted = 0
+    for req in stuck:
+        async with session_factory() as session:
+            event = await create_event(NotificationEventType.REQUEST_STUCK, req, session)
+            if event.recipient_user_ids:
+                router: NotificationRouter = ctx.get("notification_router") or get_router(settings)
+                await router.dispatch(event, session)
+                await session.commit()
+                alerted += 1
+
+    logger.info("stuck_request_alert_job: alerted for %d stuck request(s)", alerted)
 
 
 async def crd_sync_job(ctx: dict[str, Any]) -> None:
@@ -297,6 +381,7 @@ class WorkerSettings:
     functions = [agent_review_job, release_job, send_notifications_job]
     cron_jobs = [
         cron(url_expiry_warning_job, hour={0}, minute=0, run_at_startup=False),
+        cron(stuck_request_alert_job, hour={6}, minute=0, run_at_startup=False),
         cron(
             crd_sync_job,
             minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55},
