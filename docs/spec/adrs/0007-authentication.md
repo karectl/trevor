@@ -28,7 +28,7 @@ trevor does not store passwords. It maintains a `User` table as a shadow record 
 
 ### Authorisation: Local RBAC with project scope
 
-trevor maintains its own `ProjectMembership` table (see DOMAIN_MODEL.md). This is the authorisation source of truth for project-scoped roles.
+trevor maintains its own `ProjectMembership` table (see [Domain Model](../domain-model.md)). This is the authorisation source of truth for project-scoped roles.
 
 Global roles (`tre_admin`) are carried in the Keycloak JWT as a realm role claim (`realm_access.roles`). trevor reads this claim on each request and does not cache it locally (so Keycloak role changes take effect on next token refresh).
 

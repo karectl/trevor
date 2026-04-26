@@ -26,6 +26,8 @@ uv run ruff format .             # format
 uv run alembic upgrade head      # run migrations
 uv run alembic revision --autogenerate -m "description"  # generate migration
 uv run arq trevor.worker.WorkerSettings  # run ARQ worker
+uv run zensical serve             # Serve docs (mkdocs compatible alternative)
+uv run zensical build             # Build docs (mkdocs compatible alternative)
 ```
 
 No `make`, `just`, or `task` — `uv run` only.
@@ -124,15 +126,24 @@ helm/trevor/               # Helm chart skeleton
 .github/workflows/ci.yml   # lint → test → docker build
 Dockerfile                 # multi-stage, non-root user
 Tiltfile                   # k3d/kind local dev
-spec/                      # authoritative design docs (read before implementing)
-  CONSTRAINTS.md           # non-negotiable constraints (C-01 – C-13)
-  DOMAIN_MODEL.md          # entity definitions, state machines, field-level detail
-  ITERATION_PLAN.md        # delivery plan; spec before code per iteration
-  GLOSSARY.md
-  0001-*.md … 0012-*.md    # ADRs
+docs/
+  index.md                 # project home page
+  architecture.md          # system design, tech stack, patterns
+  api.md                   # full API endpoint reference
+  ui.md                    # UI guide: templates, views by role, Datastar patterns
+  guide/
+    index.md               # developer guide: setup, testing, migrations, git workflow
+  spec/                    # authoritative design docs (read before implementing)
+    constraints.md         # non-negotiable constraints (C-01 – C-13)
+    domain-model.md        # entity definitions, state machines, field-level detail
+    iteration-plan.md      # delivery plan; spec before code per iteration
+    glossary.md
+    adrs/                  # 0001-*.md … 0012-*.md — Architecture Decision Records
+    iterations/            # per-iteration specs (iter-1.md … iter-7.md)
+spec -> docs/spec          # symlink for backward compatibility
 ```
 
-**Spec-first rule**: each iteration requires writing OpenAPI paths and DB migration spec *before* implementation. Check `spec/ITERATION_PLAN.md` for what to spec next.
+**Spec-first rule**: each iteration requires writing OpenAPI paths and DB migration spec *before* implementation. Check `docs/spec/iteration-plan.md` for what to spec next.
 
 ---
 
@@ -147,7 +158,7 @@ spec/                      # authoritative design docs (read before implementing
 
 ---
 
-## Non-negotiable constraints (abbreviated — read `spec/CONSTRAINTS.md` for full text)
+## Non-negotiable constraints (abbreviated — read `docs/spec/constraints.md` for full text)
 
 - **C-02**: Researchers never hold S3 credentials. trevor is the sole storage proxy.
 - **C-03**: `OutputObject` is immutable after submission. SHA-256 checksum verified at every state transition. No PUT/DELETE/PATCH on file content.

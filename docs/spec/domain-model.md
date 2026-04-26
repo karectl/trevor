@@ -96,7 +96,7 @@ The primary workflow entity.
 | `id` | UUID | |
 | `project_id` | UUID FK | |
 | `direction` | enum | `egress` / `ingress` |
-| `status` | enum | See lifecycle in GLOSSARY |
+| `status` | enum | See lifecycle in [Glossary](glossary.md) |
 | `title` | str | Researcher-supplied |
 | `description` | str | |
 | `submitted_by` | UUID FK | User |
@@ -117,7 +117,7 @@ An immutable file submitted as part of a request.
 | `replaces_id` | UUID FK | null for v1; points to previous version |
 | `logical_object_id` | UUID | Shared across all versions in a lineage |
 | `filename` | str | Original filename |
-| `output_type` | enum | See Output Type in GLOSSARY |
+| `output_type` | enum | See Output Type in [Glossary](glossary.md) |
 | `statbarn` | str | Statbarn code (researcher-assigned, checker-verifiable) |
 | `storage_key` | str | Key in quarantine S3 bucket |
 | `checksum_sha256` | str | Computed at upload |
