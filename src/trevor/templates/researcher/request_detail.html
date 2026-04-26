@@ -4,8 +4,12 @@
 <div class="page-header">
   <div class="flex justify-between align-center">
     <div>
+      <a href="/ui/requests" class="text-muted text-sm">&larr; All requests</a>
       <h1>{{ airlock_request.title }}</h1>
-      <p class="text-muted text-sm">{{ airlock_request.direction }} &middot; {{ project.display_name if project else airlock_request.project_id }}</p>
+      <p class="text-muted text-sm">
+        {{ airlock_request.direction }} &middot;
+        {{ project.display_name if project else airlock_request.project_id }}
+      </p>
     </div>
     <div id="status-area" data-on-load="@get('/ui/sse/requests/{{ airlock_request.id }}/status')">
       {% set status = airlock_request.status %}{% include 'components/status_badge_sse.html' %}
@@ -14,67 +18,310 @@
 </div>
 
 {% if airlock_request.description %}
-<p class="mb-2">{{ airlock_request.description }}</p>
+<p class="mb-2 text-muted text-sm">{{ airlock_request.description }}</p>
 {% endif %}
 
-{# Action bar #}
-<div class="flex gap-1 mb-2">
+{# Top action bar #}
+<div class="ws-actions mb-2">
   {% if airlock_request.status.value == "DRAFT" %}
-  <a href="/ui/requests/{{ airlock_request.id }}/upload" class="btn">Upload Object</a>
-  <form method="post" action="/ui/requests/{{ airlock_request.id }}/submit" style="display:inline">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit" class="btn btn-primary">Submit for Review</button>
+  <form method="post" action="/ui/requests/{{ airlock_request.id }}/submit">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="btn btn-primary"
+      {% if not objects %}disabled title="Upload at least one object first"{% endif %}>
+      Submit for Review
+    </button>
   </form>
   {% elif airlock_request.status.value == "CHANGES_REQUESTED" %}
-  <form method="post" action="/ui/requests/{{ airlock_request.id }}/resubmit" style="display:inline">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <form method="post" action="/ui/requests/{{ airlock_request.id }}/resubmit">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Resubmit</button>
   </form>
   {% elif airlock_request.status.value == "APPROVED" and is_admin %}
-  <form method="post" action="/ui/requests/{{ airlock_request.id }}/release" style="display:inline">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <form method="post" action="/ui/requests/{{ airlock_request.id }}/release">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Release</button>
   </form>
   {% endif %}
 </div>
 
-{# Tabs #}
-<div data-signals="{tab: 'objects'}">
+{# Main tabs #}
+<div data-signals="{mainTab: 'objects', objIdx: 0, showUpload: false, showMeta: -1}">
   <div class="tabs">
-    <span class="tab active" data-class-active="tab.value === 'objects'" data-on-click="tab.value = 'objects'" style="cursor:pointer">Objects ({{ objects|length }})</span>
-    <span class="tab" data-class-active="tab.value === 'reviews'" data-on-click="tab.value = 'reviews'" style="cursor:pointer">Reviews ({{ reviews|length }})</span>
-    <span class="tab" data-class-active="tab.value === 'audit'" data-on-click="tab.value = 'audit'" style="cursor:pointer">Audit</span>
+    <span class="tab" data-class-active="mainTab.value === 'objects'"
+          data-on-click="mainTab.value = 'objects'" style="cursor:pointer">
+      Objects ({{ objects|length }})
+    </span>
+    <span class="tab" data-class-active="mainTab.value === 'reviews'"
+          data-on-click="mainTab.value = 'reviews'" style="cursor:pointer">
+      Reviews ({{ reviews|length }})
+    </span>
+    <span class="tab" data-class-active="mainTab.value === 'audit'"
+          data-on-click="mainTab.value = 'audit'" style="cursor:pointer">
+      Audit
+    </span>
   </div>
 
-  {# Objects tab #}
-  <div data-show="tab.value === 'objects'">
-    {% if objects %}
-    {% for obj in objects %}
-    <div class="card">
-      <div class="flex justify-between align-center">
-        <div>
-          <strong>{{ obj.filename }}</strong>
-          <span class="text-muted text-sm">v{{ obj.version }} &middot; {{ obj.output_type }} &middot; {{ (obj.size_bytes / 1024)|round(1) }}KB</span>
+  {# ── Objects tab ── #}
+  <div data-show="mainTab.value === 'objects'">
+    {% if objects or airlock_request.status.value == "DRAFT" %}
+    <div class="ws-shell">
+
+      {# ── Left nav panel ── #}
+      <nav class="ws-nav">
+        <div class="ws-nav-head">
+          <span>Objects</span>
+          <span class="badge">{{ objects|length }}</span>
         </div>
-        <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ") }}</span>
-      </div>
-      {% if obj.state.value == "CHANGES_REQUESTED" and airlock_request.status.value == "CHANGES_REQUESTED" %}
-      <div class="mt-1">
-        <a href="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/replace" class="btn btn-sm">Replace</a>
-      </div>
-      {% endif %}
-      <div class="mt-1">
-        <a href="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/metadata" class="btn btn-sm">Metadata</a>
-      </div>
-    </div>
-    {% endfor %}
+        <div class="ws-nav-list">
+          {% for obj in objects %}
+          {%- set ext = obj.filename.rsplit('.', 1)[-1].lower() if '.' in obj.filename else '' -%}
+          {%- set ft_map = {
+            'csv':'tabular','tsv':'tabular','tab':'tabular','parquet':'tabular','xlsx':'tabular',
+            'png':'figure','jpg':'figure','jpeg':'figure','gif':'figure','svg':'figure','pdf':'figure',
+            'py':'code','r':'code','js':'code','sh':'code','sql':'code',
+            'md':'report','txt':'report','docx':'report',
+            'pkl':'model','pt':'model','h5':'model','onnx':'model','joblib':'model'
+          } -%}
+          {%- set ft = ft_map.get(ext, obj.output_type) -%}
+          {%- set ft_labels = {'tabular':'CSV','figure':'IMG','code':'CODE','report':'DOC','model':'MDL','other':'OTH'} -%}
+          {%- set ft_label = ft_labels.get(ft, ext[:3].upper() or '?') -%}
+          <div class="ws-nav-item"
+               data-class-ws-nav-active="objIdx.value === {{ loop.index0 }}"
+               data-on-click="objIdx.value = {{ loop.index0 }}; showUpload.value = false; showMeta.value = -1">
+            <span class="ft-icon ft-{{ ft }}">{{ ft_label }}</span>
+            <div class="ws-nav-item-info">
+              <div class="ws-nav-item-name" title="{{ obj.filename }}">{{ obj.filename }}</div>
+              <div class="ws-nav-item-meta">v{{ obj.version }} &middot; {{ obj.output_type }}</div>
+            </div>
+            <span class="obj-state-dot dot-{{ obj.state }}"></span>
+          </div>
+          {% endfor %}
+
+          {% if not objects %}
+          <div class="ws-empty">
+            <span class="ws-empty-icon">📂</span>
+            <span>No objects yet</span>
+          </div>
+          {% endif %}
+        </div>
+
+        {# Add object button — only in DRAFT #}
+        {% if airlock_request.status.value == "DRAFT" %}
+        <div class="ws-nav-add">
+          <button type="button" class="btn btn-sm" style="width:100%"
+                  data-on-click="showUpload.value = !showUpload.value; showMeta.value = -1">
+            + Add Object
+          </button>
+        </div>
+        {% endif %}
+      </nav>
+
+      {# ── Right main panel ── #}
+      <div class="ws-main">
+
+        {# Upload form (toggled) #}
+        <div data-show="showUpload.value">
+          <div class="ws-pane-title">Add New Object</div>
+          <form method="post" action="/ui/requests/{{ airlock_request.id }}/upload"
+                enctype="multipart/form-data" id="upload-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="form-group">
+              <label for="file">File <span style="color:#b91c1c">*</span></label>
+              <input type="file" name="file" id="file" required
+                     accept=".csv,.tsv,.parquet,.xlsx,.xls,.png,.jpg,.jpeg,.gif,.svg,.pdf,.py,.r,.js,.sh,.sql,.md,.txt,.docx,.pkl,.pt,.h5,.onnx,.joblib">
+              <p class="text-muted text-sm mt-1">Max {{ settings.max_upload_size_mb }}MB. Supported: CSV, TSV, Parquet, images, code, Markdown, PDF, model files.</p>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="output_type">Output Type <span style="color:#b91c1c">*</span></label>
+                <select name="output_type" id="output_type" required>
+                  <option value="">— select —</option>
+                  <option value="tabular">Tabular (CSV, spreadsheet, table)</option>
+                  <option value="figure">Figure (image, chart, plot)</option>
+                  <option value="code">Code (script, notebook)</option>
+                  <option value="report">Report (Markdown, PDF, document)</option>
+                  <option value="model">Model (ML model file)</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="statbarn">
+                  Statbarn category
+                  <span class="text-muted text-sm" title="Statistical disclosure control category. Required for tabular and figure outputs.">(?)</span>
+                </label>
+                <input type="text" name="statbarn" id="statbarn"
+                       placeholder="e.g. frequency, mean, regression"
+                       title="SDC category assigned by your TRE's Statbarn tool. Required for tabular and figure outputs.">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="obj_title">Title</label>
+              <input type="text" name="obj_title" id="obj_title" placeholder="Short descriptive name">
+            </div>
+
+            <div class="form-group">
+              <label for="obj_description">Description</label>
+              <textarea name="obj_description" id="obj_description" rows="2"
+                        placeholder="What does this output contain?"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="researcher_justification">Researcher justification <span style="color:#b91c1c">*</span></label>
+              <textarea name="researcher_justification" id="researcher_justification" rows="3"
+                        placeholder="Why does this output need to leave the TRE? Explain the scientific or operational need." required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="suppression_notes">Suppression / rounding notes</label>
+              <textarea name="suppression_notes" id="suppression_notes" rows="2"
+                        placeholder="Describe any cell suppression, rounding, or other SDC measures applied."></textarea>
+            </div>
+
+            <div class="flex gap-1">
+              <button type="submit" class="btn btn-primary">Upload</button>
+              <button type="button" class="btn"
+                      data-on-click="showUpload.value = false">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        {# Per-object detail panes #}
+        <div data-show="!showUpload.value">
+          {% if not objects %}
+          <div class="ws-empty">
+            <span class="ws-empty-icon">📎</span>
+            <p>Click <strong>+ Add Object</strong> to upload your first output file.</p>
+          </div>
+          {% endif %}
+
+          {% for obj in objects %}
+          {%- set meta = object_metadata.get(obj.logical_object_id) -%}
+          <div data-show="objIdx.value === {{ loop.index0 }}">
+
+            <div class="flex justify-between align-center mb-2">
+              <h2 class="ws-pane-title" style="margin-bottom:0">{{ obj.filename }}</h2>
+              <span class="badge badge-{{ obj.state }}">{{ obj.state|replace('_',' ') }}</span>
+            </div>
+
+            {# Core object properties #}
+            <div class="rv-meta-grid">
+              <div class="rv-meta-label">Output type</div>
+              <div class="rv-meta-value">{{ obj.output_type }}</div>
+
+              <div class="rv-meta-label">Statbarn category</div>
+              <div class="rv-meta-value">{{ obj.statbarn or '—' }}</div>
+
+              <div class="rv-meta-label">Version</div>
+              <div class="rv-meta-value">{{ obj.version }}</div>
+
+              <div class="rv-meta-label">Size</div>
+              <div class="rv-meta-value">{{ (obj.size_bytes / 1024)|round(1) }} KB</div>
+
+              <div class="rv-meta-label">Uploaded</div>
+              <div class="rv-meta-value">{{ obj.uploaded_at.strftime('%d %b %Y %H:%M') if obj.uploaded_at else '—' }}</div>
+
+              <div class="rv-meta-label">SHA-256</div>
+              <div class="rv-meta-value rv-mono text-sm">{{ obj.checksum_sha256[:16] }}…</div>
+            </div>
+
+            {# Checker feedback (if any) #}
+            {% if meta and meta.checker_feedback %}
+            <div class="rv-section">
+              <h3>Checker feedback</h3>
+              {% for fb in meta.checker_feedback %}
+              <div class="flash flash-info mb-1">{{ fb.get('feedback','') if fb is mapping else fb }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            {# Replace button (CHANGES_REQUESTED) #}
+            {% if obj.state.value in ("CHANGES_REQUESTED", "REJECTED") and airlock_request.status.value == "CHANGES_REQUESTED" %}
+            <div class="mb-2">
+              <a href="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/replace"
+                 class="btn btn-sm">Replace file</a>
+            </div>
+            {% endif %}
+
+            {# Inline metadata section #}
+            <div class="ws-meta-section">
+              <h3>Metadata
+                {% if airlock_request.status.value == "DRAFT" %}
+                <button type="button" class="btn btn-sm"
+                        data-on-click="showMeta.value = showMeta.value === {{ loop.index0 }} ? -1 : {{ loop.index0 }}"
+                        style="margin-left:.5rem">
+                  Edit
+                </button>
+                {% endif %}
+              </h3>
+
+              {# Read-only view #}
+              <div data-show="showMeta.value !== {{ loop.index0 }}">
+                <div class="rv-meta-grid">
+                  <div class="rv-meta-label">Title</div>
+                  <div class="rv-meta-value">{{ meta.title if meta and meta.title else '—' }}</div>
+
+                  <div class="rv-meta-label">Description</div>
+                  <div class="rv-meta-value">{{ meta.description if meta and meta.description else '—' }}</div>
+
+                  <div class="rv-meta-label">Justification</div>
+                  <div class="rv-meta-value">{{ meta.researcher_justification if meta and meta.researcher_justification else '—' }}</div>
+
+                  <div class="rv-meta-label">Suppression notes</div>
+                  <div class="rv-meta-value">{{ meta.suppression_notes if meta and meta.suppression_notes else '—' }}</div>
+                </div>
+              </div>
+
+              {# Edit form #}
+              <div data-show="showMeta.value === {{ loop.index0 }}">
+                <form method="post"
+                      action="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/metadata">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" name="title"
+                           value="{{ meta.title if meta else '' }}"
+                           placeholder="Short descriptive name">
+                  </div>
+                  <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" rows="2"
+                              placeholder="What does this output contain?">{{ meta.description if meta else '' }}</textarea>
+                  </div>
+                  <div class="form-group">
+                    <label>Researcher justification <span style="color:#b91c1c">*</span></label>
+                    <textarea name="researcher_justification" rows="3"
+                              placeholder="Why does this output need to leave the TRE?">{{ meta.researcher_justification if meta else '' }}</textarea>
+                  </div>
+                  <div class="form-group">
+                    <label>Suppression / rounding notes</label>
+                    <textarea name="suppression_notes" rows="2"
+                              placeholder="Any cell suppression, rounding, or SDC measures applied.">{{ meta.suppression_notes if meta else '' }}</textarea>
+                  </div>
+                  <div class="flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                    <button type="button" class="btn btn-sm"
+                            data-on-click="showMeta.value = -1">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+          </div>{# end object pane #}
+          {% endfor %}
+
+        </div>{# end !showUpload #}
+      </div>{# end ws-main #}
+    </div>{# end ws-shell #}
     {% else %}
     <div class="empty-state"><p>No objects uploaded yet.</p></div>
     {% endif %}
-  </div>
+  </div>{# end objects tab #}
 
-  {# Reviews tab #}
-  <div data-show="tab.value === 'reviews'">
+  {# ── Reviews tab ── #}
+  <div data-show="mainTab.value === 'reviews'">
     {% if reviews %}
     {% for rev in reviews %}
     <div class="card">
@@ -82,7 +329,7 @@
         <strong>{{ rev.reviewer_type|title }} Review</strong>
         <span class="badge badge-{{ rev.decision|upper }}">{{ rev.decision }}</span>
       </div>
-      {% if rev.summary %}<p>{{ rev.summary }}</p>{% endif %}
+      {% if rev.summary %}<p class="text-sm">{{ rev.summary }}</p>{% endif %}
       {% if rev.findings %}
       <details class="mt-1">
         <summary class="text-sm text-muted">Findings ({{ rev.findings|length }})</summary>
@@ -101,26 +348,27 @@
     {% endif %}
   </div>
 
-  {# Audit tab #}
-  <div data-show="tab.value === 'audit'">
+  {# ── Audit tab ── #}
+  <div data-show="mainTab.value === 'audit'">
     {% if audit_events %}
     <div class="card">
-    <table>
-      <thead><tr><th>Time</th><th>Event</th><th>Actor</th></tr></thead>
-      <tbody>
-        {% for ev in audit_events %}
-        <tr>
-          <td class="text-sm">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M') if ev.timestamp else '' }}</td>
-          <td>{{ ev.event_type }}</td>
-          <td class="text-muted text-sm">{{ ev.actor_id }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+      <table>
+        <thead><tr><th>Time</th><th>Event</th><th>Actor</th></tr></thead>
+        <tbody>
+          {% for ev in audit_events %}
+          <tr>
+            <td class="text-sm">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M') if ev.timestamp else '' }}</td>
+            <td>{{ ev.event_type }}</td>
+            <td class="text-muted text-sm">{{ ev.actor_id }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
     {% else %}
     <div class="empty-state"><p>No audit events.</p></div>
     {% endif %}
   </div>
-</div>
+
+</div>{# end signals #}
 {% endblock %}

@@ -8,7 +8,7 @@
   <script type="module" src="https://cdn.jsdelivr.net/npm/@starfederation/datastar@1.0.0-beta.11/bundles/datastar.js"></script>
 </head>
 <body>
-<div class="rv-shell">
+<div class="rv-shell" data-signals="{selected: 0}">
 
   {# ---- Header bar ---- #}
   <header class="rv-header">
@@ -19,39 +19,49 @@
       <span class="badge badge-{{ airlock_request.status }}">{{ airlock_request.status|replace("_", " ") }}</span>
     </div>
     <div class="rv-header-right">
-      {% set all_decided = objects|selectattr('state', 'ne', 'PENDING')|list|length == objects|length %}
-      {% set all_approved = objects|selectattr('state', 'equalto', 'APPROVED')|list|length == objects|length and objects|length > 0 %}
       <span class="rv-progress text-sm text-muted">
         {{ objects|selectattr('state', 'ne', 'PENDING')|list|length }}/{{ objects|length }} reviewed
       </span>
-      <span class="user-info">{{ user.display_name }}</span>
       <a href="/auth/logout" class="rv-logout text-sm">Log out</a>
     </div>
   </header>
 
   {# ---- Main split ---- #}
-  <div class="rv-main" data-store='{ "selected": 0 }'>
+  <div class="rv-main">
 
     {# ---- Sidebar: object list ---- #}
     <aside class="rv-sidebar">
       <div class="rv-sidebar-head">
-        <span class="text-sm text-muted">{{ objects|length }} output{{ 's' if objects|length != 1 }}</span>
+        <span class="text-sm font-weight-600">Output objects</span>
+        <span class="text-sm text-muted">{{ objects|length }} file{{ 's' if objects|length != 1 }}</span>
       </div>
+
       {% for obj in objects %}
+      {%- set ext = obj.filename.rsplit('.', 1)[-1].lower() if '.' in obj.filename else '' -%}
+      {%- set ft_map = {
+        'csv':'tabular','tsv':'tabular','tab':'tabular','parquet':'tabular','xlsx':'tabular',
+        'png':'figure','jpg':'figure','jpeg':'figure','gif':'figure','svg':'figure','pdf':'figure',
+        'py':'code','r':'code','js':'code','sh':'code','sql':'code',
+        'md':'report','txt':'report','docx':'report',
+        'pkl':'model','pt':'model','h5':'model','onnx':'model','joblib':'model'
+      } -%}
+      {%- set ft = ft_map.get(ext, obj.output_type) -%}
+      {%- set ft_labels = {'tabular':'CSV','figure':'IMG','code':'CODE','report':'DOC','model':'MDL','other':'OTH'} -%}
+      {%- set ft_label = ft_labels.get(ft, ext[:3].upper() or '?') -%}
+
       <div class="rv-file-row"
-           data-class-rv-file-selected="$selected === {{ loop.index0 }}"
-           data-on-click="$selected = {{ loop.index0 }}"
-           data-attr-data-state="{{ obj.state }}">
-        <span class="rv-file-indicator rv-indicator-{{ obj.state|lower }}"></span>
+           data-class-rv-file-selected="selected.value === {{ loop.index0 }}"
+           data-on-click="selected.value = {{ loop.index0 }}">
+        <span class="ft-icon ft-{{ ft }}">{{ ft_label }}</span>
         <div class="rv-file-info">
           <div class="rv-file-name">{{ obj.filename }}</div>
-          <div class="rv-file-meta text-sm text-muted">
+          <div class="rv-file-meta text-muted">
             v{{ obj.version }} &middot; {{ obj.output_type }}
             {% if obj.statbarn %}&middot; {{ obj.statbarn }}{% endif %}
             &middot; {{ (obj.size_bytes / 1024)|round(1) }}KB
           </div>
         </div>
-        <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ")|lower }}</span>
+        <span class="obj-state-dot dot-{{ obj.state }}"></span>
       </div>
       {% endfor %}
     </aside>
@@ -59,10 +69,14 @@
     {# ---- Detail panel: one per object, toggled by Datastar ---- #}
     <section class="rv-detail">
       {% for obj in objects %}
-      <div class="rv-detail-pane" data-show="$selected === {{ loop.index0 }}">
+      <div class="rv-detail-pane" data-show="selected.value === {{ loop.index0 }}">
 
-        <h2>{{ obj.filename }}</h2>
+        <div class="flex justify-between align-center mb-2">
+          <h2 style="font-size:1.1rem;font-weight:600">{{ obj.filename }}</h2>
+          <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ") }}</span>
+        </div>
 
+        {# Object properties #}
         <div class="rv-meta-grid">
           <div class="rv-meta-label">Output type</div>
           <div class="rv-meta-value">{{ obj.output_type }}</div>
@@ -77,18 +91,22 @@
           <div class="rv-meta-value">{{ (obj.size_bytes / 1024)|round(1) }}KB</div>
 
           <div class="rv-meta-label">Uploaded</div>
-          <div class="rv-meta-value">{{ obj.uploaded_at.strftime('%d %B %Y at %H:%M') }}</div>
+          <div class="rv-meta-value">{{ obj.uploaded_at.strftime('%d %b %Y %H:%M') if obj.uploaded_at else '—' }}</div>
 
           <div class="rv-meta-label">SHA-256</div>
           <div class="rv-meta-value rv-mono text-sm">{{ obj.checksum_sha256[:16] }}…</div>
         </div>
 
-        {# ---- Metadata (researcher justification etc) ---- #}
+        {# Researcher metadata #}
         {% set meta = object_metadata.get(obj.logical_object_id) %}
         {% if meta %}
         <div class="rv-section">
           <h3>Researcher metadata</h3>
           <div class="rv-meta-grid">
+            {% if meta.title %}
+            <div class="rv-meta-label">Title</div>
+            <div class="rv-meta-value">{{ meta.title }}</div>
+            {% endif %}
             {% if meta.description %}
             <div class="rv-meta-label">Description</div>
             <div class="rv-meta-value">{{ meta.description }}</div>
@@ -105,7 +123,7 @@
         </div>
         {% endif %}
 
-        {# ---- File preview ---- #}
+        {# File preview #}
         {% set preview = object_previews.get(obj.id|string) %}
         {% if preview %}
         <div class="rv-section">
@@ -114,7 +132,7 @@
         </div>
         {% endif %}
 
-        {# ---- Agent assessment for this object ---- #}
+        {# Agent assessment #}
         {% set assessment = agent_assessments.get(obj.id|string) %}
         {% if assessment %}
         <div class="rv-section">
@@ -128,12 +146,10 @@
               <span class="rv-fail-badge">No</span>
               {% endif %}
             </div>
-
             <div class="rv-meta-label">Disclosure risk</div>
             <div class="rv-meta-value">
               <span class="rv-risk-{{ assessment.disclosure_risk }}">{{ assessment.disclosure_risk }}</span>
             </div>
-
             <div class="rv-meta-label">Recommendation</div>
             <div class="rv-meta-value">
               <span class="badge badge-{{ assessment.recommendation|upper }}">{{ assessment.recommendation }}</span>
@@ -155,7 +171,7 @@
           {% endif %}
 
           {% if assessment.explanation %}
-          <div class="rv-agent-narrative">
+          <div class="rv-agent-narrative mt-1">
             <h4>Agent narrative</h4>
             <p>{{ assessment.explanation }}</p>
           </div>
@@ -164,29 +180,54 @@
         {% elif agent_review %}
         <div class="rv-section">
           <h3>Agent review</h3>
-          <p>{{ agent_review.summary }}</p>
+          <p class="text-sm">{{ agent_review.summary }}</p>
         </div>
         {% endif %}
 
-        {# ---- Per-object review controls ---- #}
+        {# Per-object review decision #}
         {% if obj.state.value == "PENDING" %}
         <div class="rv-section rv-review-controls">
-          <h3>Review decision</h3>
-          <p class="rv-review-note text-sm text-muted">You cannot reject this output until you add a comment.</p>
+          <h3>Your decision on this file</h3>
+          <p class="rv-review-note text-sm text-muted mb-1">
+            Rejecting or requesting changes on <em>any</em> file will affect the entire request.
+            A comment is required when not approving.
+          </p>
           <div class="rv-btn-group">
-            <button type="button" class="rv-approve-btn" data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='approved'; this.closest('.rv-btn-group').querySelector('.rv-reject-btn').classList.remove('rv-btn-active'); this.classList.add('rv-btn-active')">Approve</button>
-            <button type="button" class="rv-reject-btn" data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='rejected'; this.closest('.rv-btn-group').querySelector('.rv-approve-btn').classList.remove('rv-btn-active'); this.classList.add('rv-btn-active')">Reject</button>
+            <button type="button" class="rv-approve-btn"
+                    data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='approved';
+                                   this.classList.add('rv-btn-active');
+                                   this.nextElementSibling.nextElementSibling.classList.remove('rv-btn-active')">
+              Approve
+            </button>
+            <button type="button" class="rv-changes-btn"
+                    data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='changes_requested';
+                                   this.classList.add('rv-btn-active');
+                                   this.previousElementSibling.classList.remove('rv-btn-active');
+                                   this.nextElementSibling.classList.remove('rv-btn-active')">
+              Request changes
+            </button>
+            <button type="button" class="rv-reject-btn"
+                    data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='rejected';
+                                   this.classList.add('rv-btn-active');
+                                   this.previousElementSibling.previousElementSibling.classList.remove('rv-btn-active')">
+              Reject
+            </button>
           </div>
           <div class="rv-comment mt-1">
-            <label for="obj_{{ obj.id }}_feedback" class="text-sm">Comment on {{ obj.filename }}:</label>
-            <textarea id="obj_{{ obj.id }}_feedback" name="obj_{{ obj.id }}_feedback" form="review-form" placeholder="Required for rejection"></textarea>
+            <label for="obj_{{ obj.id }}_feedback" class="text-sm">
+              Feedback for researcher on <em>{{ obj.filename }}</em>:
+            </label>
+            <textarea id="obj_{{ obj.id }}_feedback"
+                      name="obj_{{ obj.id }}_feedback"
+                      form="review-form"
+                      placeholder="Required when requesting changes or rejecting"></textarea>
           </div>
         </div>
         {% else %}
         <div class="rv-section">
           <div class="rv-decided">
-            <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ")|lower }}</span>
-            <span class="text-sm text-muted">Already decided</span>
+            <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ") }}</span>
+            <span class="text-sm text-muted">Already decided in a previous review</span>
           </div>
         </div>
         {% endif %}
@@ -195,7 +236,7 @@
       {% endfor %}
     </section>
 
-  </div>
+  </div>{# rv-main #}
 
   {# ---- Bottom bar with submit ---- #}
   <footer class="rv-footer">
@@ -216,7 +257,7 @@
         </div>
       </div>
       <div class="rv-footer-center">
-        <input type="text" name="summary" placeholder="Summary (optional)" class="rv-summary-input">
+        <input type="text" name="summary" placeholder="Overall summary (required)" class="rv-summary-input" required>
       </div>
       <div class="rv-footer-right">
         <button type="submit" class="btn btn-primary">Submit Review</button>
@@ -224,6 +265,6 @@
     </form>
   </footer>
 
-</div>
+</div>{# rv-shell #}
 </body>
 </html>

@@ -356,3 +356,103 @@ textarea { resize: vertical; min-height: 80px; }
 .badge-notify:empty { display: none; }
 .badge-count { background: var(--primary, #0d6efd); color: #fff; border-radius: 999px; font-size: .65rem; font-weight: 700; padding: 0 4px; min-width: 16px; text-align: center; line-height: 16px; display: inline-block; }
 .badge-count:empty { display: none; }
+
+/* ---- Two-panel object workspace (iter-20) ---- */
+/* Used by both researcher request_detail and checker review_form */
+
+/* file-type icon badges */
+.ft-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--radius);
+  font-size: .7rem; font-weight: 700; letter-spacing: -.02em;
+  flex-shrink: 0; text-transform: uppercase;
+}
+.ft-tabular  { background: #dbeafe; color: #1e40af; }
+.ft-figure   { background: #fce7f3; color: #9d174d; }
+.ft-model    { background: #ede9fe; color: #5b21b6; }
+.ft-code     { background: #ecfdf5; color: #065f46; }
+.ft-report   { background: #fef9c3; color: #854d0e; }
+.ft-other    { background: #f1f5f9; color: #475569; }
+
+/* state dot */
+.obj-state-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.dot-PENDING          { background: var(--status-draft); }
+.dot-APPROVED         { background: var(--status-approved); }
+.dot-REJECTED         { background: var(--status-rejected); }
+.dot-CHANGES_REQUESTED{ background: var(--status-changes); }
+.dot-SUPERSEDED       { background: var(--border); }
+
+/* workspace shell — same structure as rv-shell but used on normal pages */
+.ws-shell {
+  display: flex; gap: 0; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface);
+  box-shadow: var(--shadow); overflow: hidden; min-height: 520px;
+}
+
+/* left nav panel */
+.ws-nav {
+  width: 260px; min-width: 220px; flex-shrink: 0;
+  border-right: 1px solid var(--border); background: #f8fafc;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.ws-nav-head {
+  padding: 10px 14px 8px; border-bottom: 1px solid var(--border);
+  font-size: .75rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ws-nav-list { flex: 1; overflow-y: auto; }
+.ws-nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.ws-nav-item:hover { background: #eef2f7; }
+.ws-nav-item.ws-nav-active { background: #e8eef7; border-left: 3px solid var(--primary); padding-left: 11px; }
+.ws-nav-item-info { flex: 1; min-width: 0; }
+.ws-nav-item-name {
+  font-size: .82rem; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ws-nav-item-meta { font-size: .72rem; color: var(--text-muted); }
+.ws-nav-add {
+  padding: 8px 14px; border-top: 1px solid var(--border);
+}
+
+/* right detail panel */
+.ws-main {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+  display: flex; flex-direction: column;
+}
+.ws-pane { display: none; }
+.ws-pane.ws-pane-active { display: block; }
+.ws-pane-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 16px; }
+
+/* upload panel (new-object form) */
+.ws-upload-panel {
+  padding: 16px 20px; border-top: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+/* inline metadata section within detail pane */
+.ws-meta-section {
+  margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.ws-meta-section h3 {
+  font-size: .82rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-muted); margin-bottom: 12px;
+}
+
+/* actions bar */
+.ws-actions { display: flex; gap: .5rem; margin-bottom: 16px; flex-wrap: wrap; }
+
+/* empty-pane placeholder */
+.ws-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-muted); gap: .5rem; padding: 40px;
+}
+.ws-empty-icon { font-size: 2.5rem; }

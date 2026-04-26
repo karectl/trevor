@@ -177,6 +177,17 @@ async def request_detail(
     auth: CurrentAuth,
     session: Session,
 ) -> HTMLResponse:
+    ctx = await _build_request_detail_ctx(request, request_id, auth, session)
+    return templates.TemplateResponse("researcher/request_detail.html", ctx)
+
+
+async def _build_request_detail_ctx(
+    request: Request,
+    request_id: uuid.UUID,
+    auth: AuthContext,
+    session: AsyncSession,
+) -> dict:
+    """Shared helper to build the full request_detail template context."""
     req = await session.get(AirlockRequest, request_id)
     if not req:
         raise HTTPException(status_code=404)
@@ -192,6 +203,12 @@ async def request_detail(
     )
     objects = list(obj_result.all())
 
+    object_metadata: dict[uuid.UUID, OutputObjectMetadata] = {}
+    for obj in objects:
+        meta = await session.get(OutputObjectMetadata, obj.logical_object_id)
+        if meta:
+            object_metadata[obj.logical_object_id] = meta
+
     rev_result = await session.exec(
         select(Review).where(Review.request_id == request_id).order_by(Review.created_at)
     )
@@ -202,32 +219,17 @@ async def request_detail(
     )
     audit_events = list(audit_result.all())
 
-    ctx = _base_ctx(request, auth)
-    # Template uses 'request' for both FastAPI Request and AirlockRequest.
-    # Rename the domain object.
-    ctx.update(
-        request=request,  # keep Starlette request for url generation
-        airlock_request=req,
-        project=project,
-        objects=objects,
-        reviews=reviews,
-        audit_events=audit_events,
-    )
-    # The template references {{ request.* }} for both — we'll fix by passing as 'req'
-    # Actually, Jinja2Templates needs 'request' as Starlette Request.
-    # We pass domain object as separate name.
-    return templates.TemplateResponse(
-        "researcher/request_detail.html",
-        {
-            **_base_ctx(request, auth),
-            "request": request,  # Starlette
-            "airlock_request": req,
-            "project": project,
-            "objects": objects,
-            "reviews": reviews,
-            "audit_events": audit_events,
-        },
-    )
+    return {
+        **_base_ctx(request, auth),
+        "request": request,
+        "airlock_request": req,
+        "project": project,
+        "objects": objects,
+        "object_metadata": object_metadata,
+        "reviews": reviews,
+        "audit_events": audit_events,
+        "settings": get_settings(),
+    }
 
 
 @router.get("/requests/{request_id}/upload", response_class=HTMLResponse)
@@ -255,6 +257,10 @@ async def object_upload(
     file: UploadFile,
     output_type: Annotated[str, Form()],
     statbarn: Annotated[str, Form()] = "",
+    obj_title: Annotated[str, Form()] = "",
+    obj_description: Annotated[str, Form()] = "",
+    researcher_justification: Annotated[str, Form()] = "",
+    suppression_notes: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     import hashlib
 
@@ -267,6 +273,19 @@ async def object_upload(
     logical_object_id = uuid.uuid4()
     object_id = uuid.uuid4()
     storage_key = f"{req.project_id}/{req.id}/{logical_object_id}/1/{object_id}-{file.filename}"
+
+    if not settings.dev_auth_bypass and (settings.s3_endpoint_url or settings.s3_access_key_id):
+        import io as _io
+
+        from trevor.storage import upload_fileobj
+
+        await upload_fileobj(
+            bucket=settings.s3_quarantine_bucket,
+            key=storage_key,
+            fileobj=_io.BytesIO(raw),
+            content_type=file.content_type or "application/octet-stream",
+            settings=settings,
+        )
 
     obj = OutputObject(
         id=object_id,
@@ -282,7 +301,13 @@ async def object_upload(
         uploaded_by=auth.user.id,
     )
     session.add(obj)
-    meta = OutputObjectMetadata(logical_object_id=logical_object_id)
+    meta = OutputObjectMetadata(
+        logical_object_id=logical_object_id,
+        title=obj_title,
+        description=obj_description,
+        researcher_justification=researcher_justification,
+        suppression_notes=suppression_notes,
+    )
     session.add(meta)
     await audit_service.emit(
         session,
@@ -327,6 +352,7 @@ async def object_metadata_save(
     object_id: uuid.UUID,
     auth: CurrentAuth,
     session: Session,
+    title: Annotated[str, Form()] = "",
     description: Annotated[str, Form()] = "",
     researcher_justification: Annotated[str, Form()] = "",
     suppression_notes: Annotated[str, Form()] = "",
@@ -338,6 +364,7 @@ async def object_metadata_save(
     if not meta:
         meta = OutputObjectMetadata(logical_object_id=obj.logical_object_id)
         session.add(meta)
+    meta.title = title
     meta.description = description
     meta.researcher_justification = researcher_justification
     meta.suppression_notes = suppression_notes

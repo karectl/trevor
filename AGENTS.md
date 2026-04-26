@@ -9,7 +9,7 @@ Egress/airlock microservice for the KARECTL TRE. Controls import/export of resea
 ```bash
 uv sync                                              # install deps
 uv run trevor                                        # run app (:8000)
-uv run pytest -v                                     # run tests (220, no external deps)
+uv run pytest -v                                     # run tests (262, no external deps)
 uv run ruff check . && uv run ruff format --check .  # lint + format check
 uv run ruff format .                                 # auto-format
 uv run alembic upgrade head                          # run migrations
@@ -94,7 +94,7 @@ src/trevor/
   static/style.css    # custom properties, status colours, notification styles
 tests/
   conftest.py         # in-memory SQLite, client/admin_client fixtures, DEV_AUTH_BYPASS
-  test_*.py           # 252 tests across 18 files
+  test_*.py           # 262 tests across 19 files
 alembic/versions/     # async migrations
 deploy/dev/
   crds/               # CRD schemas (Project, User, Group, KeycloakClient, VDI)

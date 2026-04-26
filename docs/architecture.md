@@ -168,7 +168,7 @@ src/trevor/
    static/                  # CSS (no JS build step)
 tests/
   conftest.py              # fixtures: in-memory SQLite, clients, sample data
-  test_*.py                # 252 tests across 18 test files
+  test_*.py                # 262 tests across 19 test files
 alembic/                   # async Alembic config + migrations
 docs/                      # this documentation (zensical)
   runbook.md               # deployment, migrations, failure modes, monitoring, scaling
@@ -178,6 +178,29 @@ deploy/dev/
   crds/                    # CRD schema definitions
   sample-project/          # Interstellar project CRs + dev user/group CRs
 ```
+
+### Two-panel researcher UI
+
+The researcher request detail page (`/ui/requests/{id}`) uses a two-panel layout:
+
+- **Left nav** — scrollable object list with file-type icons (`ft-icon ft-tabular`, `ft-figure`, etc.) and per-object state dots; a footer button opens the inline upload form
+- **Right panel** — object detail (properties, researcher metadata, file preview, agent assessment), toggled by Datastar signals (`objIdx`); tabs for Reviews and Audit
+- **Inline upload** — file upload form rendered inside the right panel (no separate page); saves `title`, `description`, `researcher_justification`, `suppression_notes` to `OutputObjectMetadata` at creation
+- **Inline metadata edit** — per-object metadata form toggled by `showMeta` signal; `POST /ui/requests/{id}/objects/{oid}/metadata` accepts all four fields including `title`
+
+The checker review form (`/ui/review/{id}`) mirrors the same left nav + right detail layout. Object selection is client-side (Datastar `selected` signal). Per-object decisions (approve / request changes / reject) are embedded in a single footer form submitted once.
+
+File-type icons are derived from filename extension first, then `obj.output_type` as fallback. Icon categories: `tabular`, `figure`, `code`, `report`, `model`, `other`.
+
+### File preview
+
+`preview_service.render_preview(filename, content)` produces sanitised HTML for the detail panel:
+
+- CSV/TSV/Parquet — polars table rendered as `<table>`, capped at 50 rows
+- Markdown — `mistune` renderer, sanitised with `nh3`
+- Code (`.py`, `.r`, `.js`, etc.) — Pygments syntax highlighting
+- Images — base64 `<img>` data URI
+- Files > 10 MB — returns `None` (no preview)
 
 ## Environment variables
 
@@ -208,4 +231,5 @@ deploy/dev/
 | `SMTP_PASSWORD` | SMTP auth password | `""` |
 | `TREVOR_BASE_URL` | Base URL used in email links | `http://localhost:8000` |
 | `STUCK_REQUEST_HOURS` | SLA threshold | `72` |
+| `URL_EXPIRY_WARNING_HOURS` | Hours before URL expiry to send warning | `48` |
 | `PRESIGNED_URL_TTL` | Release URL TTL (seconds) | `604800` (7 days) |
