@@ -21,7 +21,7 @@ See [ADR-0001](spec/adrs/0001-frontend-framework.md) for the rationale.
 src/trevor/templates/
   base.html                   # Shell: <head>, nav, Datastar CDN, flash area
   components/
-    nav.html                  # Top nav: logo, role-aware links, user info
+    nav.html                  # Top nav: logo, role-aware links, bell badge, user info
     flash.html                # Flash message partial
     pagination.html           # Reusable paginator
     status_badge.html         # Request/object status pill
@@ -42,9 +42,16 @@ src/trevor/templates/
     metrics_dashboard.html    # Pipeline metrics cards + stuck requests
     audit_log.html            # Filterable audit log table
     membership_manage.html    # Project membership CRUD
+  notifications/
+    list.html                 # Notification inbox: unread highlighted, mark-read buttons
 ```
 
 ## Views by role
+
+### All roles
+
+- **Notification inbox** (`/ui/notifications`) — lists all notifications for the current user, newest first. Unread notifications are highlighted. Each notification links to the relevant request. "Mark read" and "Mark all read" buttons use standard HTML form POST.
+- **Nav bell badge** — the 🔔 icon in the top nav shows an unread count that polls `/notifications/unread-count` every second using a Datastar `data-on-interval` signal, updating in real time without a page reload.
 
 ### Researcher
 
@@ -90,13 +97,19 @@ Minimal custom CSS in `src/trevor/static/style.css`:
 </div>
 ```
 
-### SSE live updates (planned)
+### SSE live updates
+
+The unread notification count badge uses `data-on-interval__1000ms` to poll `/notifications/unread-count` every second. The endpoint returns an SSE `datastar-merge-signals` event when called with `Accept: text/event-stream`, updating the `$count` signal that drives the badge visibility and text.
 
 ```html
-<div id="status-area"
-     data-on-load="$$get('/ui/sse/request-status/{{id}}')">
-  <!-- status badge updated via SSE -->
-</div>
+<!-- Notification badge in nav.html -->
+<span data-on-load="$$get('/notifications/unread-count')"
+      data-on-interval__1000ms="$$get('/notifications/unread-count')">
+  <a href="/ui/notifications" class="notif-bell">
+    🔔
+    <span class="notif-badge" data-show="$count > 0" data-text="$count"></span>
+  </a>
+</span>
 ```
 
-SSE endpoints use `datastar-py`'s `ServerSentEventGenerator.patch_elements()` to push HTML fragments.
+Full SSE-streamed view updates (e.g. pushing request status changes to the detail page) are planned for a future iteration.

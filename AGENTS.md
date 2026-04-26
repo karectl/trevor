@@ -53,7 +53,7 @@ No `make`, `just`, or `task` — `uv run` only.
 | Agent framework | Pydantic-AI (OpenAI-compatible backend) |
 | RO-Crate | `rocrate` Python library |
 | File preview | `mistune`, `polars`, `pygments` |
-| Notifications | Jinja2 email templates (planned) |
+| Notifications | In-app (`Notification` table, `InAppBackend`); SMTP planned (iter 15) |
 
 ---
 
@@ -67,7 +67,7 @@ src/trevor/
   database.py              # async engine (lru_cache by URL), session factory, get_session dep
   auth.py                  # AuthContext dep, DEV_AUTH_BYPASS, require_admin
   storage.py               # aioboto3 S3 abstraction (upload, download, presigned URLs)
-  worker.py                # ARQ WorkerSettings, agent_review_job, cron stubs
+  worker.py                # ARQ WorkerSettings, agent_review_job, release_job, send_notifications_job, crd_sync_job
   agent/
     __init__.py
     rules.py               # statbarn rule engine (pure functions, no I/O)
@@ -79,6 +79,7 @@ src/trevor/
     project.py             # Project, ProjectMembership, ProjectStatus, ProjectRole
     request.py             # AirlockRequest, OutputObject, OutputObjectMetadata, AuditEvent
     review.py              # Review, ReviewerType, ReviewDecision
+    notification.py        # Notification, NotificationEventType (8 event types)
   schemas/
     user.py                # UserRead, UserMeRead
     project.py             # ProjectRead
@@ -86,12 +87,15 @@ src/trevor/
     request.py             # RequestCreate/Read, OutputObjectRead, MetadataRead, AuditEventRead
     review.py              # ReviewRead
     release.py             # ReleaseRecordRead
+    notification.py        # NotificationRead, UnreadCountRead
   services/
     user_service.py        # upsert_user (create/update from CRD sync or JWT claims)
     membership_service.py  # CRUD + role conflict validation
     audit_service.py       # emit() helper for AuditEvent
     release_service.py     # assemble_and_release(), RO-Crate assembly, zip building
     metrics_service.py     # admin dashboard queries, pipeline metrics
+    notification_service.py  # NotificationEvent, InAppBackend, NotificationRouter, get_recipients, create_event, get_router
+    crd_sync_service.py    # reconcile_projects, reconcile_users, reconcile_memberships (pure, no k8s dep)
   routers/
     users.py               # GET /users/me
     projects.py            # GET /projects, GET /projects/{id}
@@ -99,16 +103,18 @@ src/trevor/
     requests.py            # CRUD + submit + upload for AirlockRequest/OutputObject
     reviews.py             # GET /requests/{id}/reviews
     releases.py            # POST/GET /requests/{id}/release
+    notifications.py       # GET/PATCH /notifications + POST /notifications/mark-all-read
     admin.py               # GET /admin/requests, /metrics, /audit, /audit/export
-    ui.py                  # Datastar HTML views: researcher, checker, admin
+    ui.py                  # Datastar HTML views: researcher, checker, admin, notifications
   templates/
     base.html              # Shell: head, nav, Datastar CDN, flash area
-    components/            # nav, flash, pagination, status_badge, file_preview
+    components/            # nav (with bell badge), flash, pagination, status_badge, file_preview
     researcher/            # request_list, request_create, request_detail, object_upload, object_metadata, object_replace, revision_feedback
     checker/               # review_queue, review_form
     admin/                 # request_overview, metrics_dashboard, audit_log, membership_manage
+    notifications/         # list.html (notification inbox)
   static/
-    style.css              # Minimal CSS (system fonts, custom properties, status colors)
+    style.css              # Minimal CSS (system fonts, custom properties, status colors, notification styles)
 tests/
   conftest.py              # fixtures: in-memory SQLite, client, admin_client, sample data
   test_health.py
@@ -121,11 +127,18 @@ tests/
   test_releases.py         # release endpoint + RO-Crate tests
   test_admin.py            # admin dashboard + metrics endpoint tests
   test_ui.py               # Datastar UI route tests
+  test_notifications.py    # notification service + API endpoint tests
+  test_crd_sync.py         # CRD sync reconciler tests
 alembic/                   # async Alembic config, migrations
 helm/trevor/               # Helm chart skeleton
+deploy/dev/
+  crds/                    # CRD schema definitions (Project, User, Group, KeycloakClient, VDI)
+  sample-project/          # Interstellar project CR + dev user/group CRs
 .github/workflows/ci.yml   # lint → test → docker build
 Dockerfile                 # multi-stage, non-root user
 Tiltfile                   # k3d/kind local dev
+scripts/
+  seed-dev-db.py           # seeds Interstellar project + dev user memberships into postgres
 docs/
   index.md                 # project home page
   architecture.md          # system design, tech stack, patterns
@@ -138,8 +151,8 @@ docs/
     domain-model.md        # entity definitions, state machines, field-level detail
     iteration-plan.md      # delivery plan; spec before code per iteration
     glossary.md
-    adrs/                  # 0001-*.md … 0012-*.md — Architecture Decision Records
-    iterations/            # per-iteration specs (iter-1.md … iter-7.md)
+    adrs/                  # 0001-*.md … 0016-*.md — Architecture Decision Records
+    iterations/            # per-iteration specs (iter-1.md … iter-14.md)
 spec -> docs/spec          # symlink for backward compatibility
 ```
 
@@ -175,9 +188,7 @@ spec -> docs/spec          # symlink for backward compatibility
 
 ## Domain model essentials
 
-**Implemented entities**: `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `AuditEvent`, `Review`, `ReleaseRecord` (all UUID PKs).
-
-**Planned entities**: `Notification`.
+**Implemented entities**: `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `AuditEvent`, `Review`, `ReleaseRecord`, `Notification` (all UUID PKs).
 
 **`AirlockRequest` states**:
 `DRAFT → SUBMITTED → AGENT_REVIEW → HUMAN_REVIEW → CHANGES_REQUESTED / APPROVED → RELEASING → RELEASED` (or `REJECTED`)
@@ -212,7 +223,7 @@ spec -> docs/spec          # symlink for backward compatibility
 
 S3 credentials and Keycloak client secrets are injected via Kubernetes Secrets in prod.
 
-Agent settings (planned):
+Agent settings:
 
 | Variable | Purpose |
 |---|---|
@@ -220,6 +231,9 @@ Agent settings (planned):
 | `AGENT_MODEL_NAME` | Model to use for agent (default: configurable) |
 | `AGENT_API_KEY` | API key for LLM backend |
 | `AGENT_LLM_ENABLED` | Enable/disable agent LLM calls (default: `false`) |
+| `NOTIFICATIONS_ENABLED` | Enable in-app notification dispatch (default: `true`) |
+| `CRD_NAMESPACE` | Kubernetes namespace to watch for CRDs (default: `trevor-dev`) |
+| `CRD_SYNC_ENABLED` | Enable periodic CRD sync cron job (default: `false`; `true` in Tiltfile) |
 
 ---
 
@@ -260,6 +274,10 @@ Agent settings (planned):
 | `GET` | `/admin/metrics` | Admin/Senior | Pipeline metrics + stuck detection |
 | `GET` | `/admin/audit` | `tre_admin` | Filterable audit log |
 | `GET` | `/admin/audit/export` | `tre_admin` | Export audit log as CSV |
+| `GET` | `/notifications/unread-count` | Any | Unread notification count (JSON or SSE signals) |
+| `GET` | `/notifications` | Any | List notifications for current user |
+| `PATCH` | `/notifications/{id}/read` | Any | Mark notification as read |
+| `POST` | `/notifications/mark-all-read` | Any | Mark all notifications as read |
 | `GET` | `/ui/requests` | Any | Researcher request list (HTML) |
 | `GET` | `/ui/requests/new` | Any | Create request form (HTML) |
 | `POST` | `/ui/requests` | Researcher | Create request via form |
@@ -284,16 +302,21 @@ Agent settings (planned):
 | `GET` | `/ui/admin/memberships/{pid}` | `tre_admin` | Membership management (HTML) |
 | `POST` | `/ui/admin/memberships` | `tre_admin` | Create membership via UI |
 | `POST` | `/ui/admin/memberships/{mid}/delete` | `tre_admin` | Delete membership via UI |
+| `GET` | `/ui/notifications` | Any | Notification inbox (HTML) |
+| `POST` | `/ui/notifications/{id}/read` | Any | Mark notification read (form POST) |
+| `POST` | `/ui/notifications/mark-all-read` | Any | Mark all read (form POST) |
 
 ---
 
 ## Local dev
 
-Full local dev stack requires: **Tilt + k3d/kind**, **MinIO** (local S3), **Keycloak** dev container, **Redis**. Unit tests avoid all of these with `DEV_AUTH_BYPASS=true` and in-memory SQLite.
+Full local dev stack requires: **Tilt + k3d/kind**, **SeaweedFS** (local S3), **Keycloak** dev container, **Redis**. Unit tests avoid all of these with `DEV_AUTH_BYPASS=true` and in-memory SQLite.
 
 ```bash
 uv sync && uv run pytest -v    # quick check — no external deps needed
 ```
+
+`tilt up` seeds the **Interstellar** project automatically via the `seed-dev-db` local resource. Dev users (`researcher-1`, `checker-1`, `checker-2`, `admin-user`) are created in Keycloak from `deploy/dev/keycloak-realm.yaml` and in postgres by `scripts/seed-dev-db.py`. All passwords: `password`.
 
 ---
 

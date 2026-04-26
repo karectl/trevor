@@ -31,7 +31,7 @@ Researchers submit output objects (files, tables, figures) for disclosure review
 
 ```bash
 uv sync
-uv run pytest -v        # 138 tests, no external services needed
+uv run pytest -v        # 195 tests, no external services needed
 uv run trevor           # API on http://localhost:8000
 ```
 
@@ -48,6 +48,12 @@ Open in VS Code → **Reopen in Container**. The post-create script installs all
 ```bash
 tilt up
 ```
+
+`tilt up` will:
+- Deploy all services (PostgreSQL, Redis, SeaweedFS, Keycloak, trevor)
+- Apply CR8TOR CRDs and sample project resources (`deploy/dev/sample-project/`)
+- Run DB migrations automatically via an init container
+- Seed the database with test users and the **Interstellar** project via the `seed-dev-db` local resource
 
 ### Bare-metal
 
@@ -71,7 +77,22 @@ Port forwards while Tilt is running:
 | 5432 | PostgreSQL | `trevor` / `trevor` |
 | 6379 | Redis | — |
 
-Test users (all passwords: `password`): `admin-user` (tre_admin), `researcher-1`, `checker-1`, `checker-2`.
+### Dev users
+
+All passwords: `password`. Seeded automatically on `tilt up`.
+
+| Username | Role | Project |
+|---|---|---|
+| `researcher-1` | researcher | Interstellar |
+| `checker-1` | output_checker | Interstellar |
+| `checker-2` | output_checker + senior_checker | Interstellar |
+| `admin-user` | tre_admin (global) | — |
+
+The **Interstellar** project is created from `deploy/dev/sample-project/project-interstellar.yaml` and seeded into postgres by the `seed-dev-db` Tilt resource. To re-run the seed manually:
+
+```bash
+uv run python scripts/seed-dev-db.py
+```
 
 ## SQLite-only mode
 
@@ -96,6 +117,7 @@ Key variables (full list in `sample.env`):
 | `S3_ENDPOINT_URL` | SeaweedFS or MinIO URL (empty = AWS S3) |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | S3 credentials |
 | `SECRET_KEY` | CSRF / session secret — must be strong in production |
+| `NOTIFICATIONS_ENABLED` | Enable in-app notification system (`true` by default) |
 | `AGENT_LLM_ENABLED` | Enable LLM-based agent review (`false` by default) |
 
 ## Helm chart

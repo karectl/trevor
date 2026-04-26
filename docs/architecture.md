@@ -76,7 +76,24 @@ Tests override via `app.dependency_overrides`.
 
 On every authenticated request, `upsert_user()` creates or updates a User shadow record from Keycloak claims. Users may also be pre-created from CRD sync with nullable `keycloak_sub`. Keycloak is source of truth for identity ([C-10](spec/constraints.md)).
 
-### Role conflict enforcement
+### Notification system
+
+`notification_service.py` implements a backend-agnostic notification dispatch pipeline:
+
+- **`NotificationEvent`** — immutable dataclass carrying event type, title, body, request ID, and resolved recipient user IDs
+- **`NotificationBackend`** protocol — `InAppBackend` writes `Notification` rows to the DB; future backends (SMTP, webhook) implement the same protocol
+- **`NotificationRouter`** — fans out to all registered backends with per-backend error isolation
+- **`send_notifications_job`** — ARQ background job that resolves recipients, builds the event, and dispatches; fired by `agent_review_job`, `release_job`, and the submit endpoint
+
+Recipient resolution: checker events (`request.submitted`, `agent_review.ready`) go to all output_checker / senior_checker members of the project; researcher events (`request.approved`, `request.released`, etc.) go to the submitter.
+
+### CRD sync
+
+`crd_sync_service.py` reconciles CR8TOR CRDs into the postgres DB every 5 minutes (ARQ cron, `run_at_startup=True`):
+
+- Reads `projects.research.karectl.io` CRs → upserts `Project` rows; uses `spec.display_name` → `spec.description` → `metadata.name` for the human-readable name
+- Reads `users.identity.karectl.io` CRs → upserts `User` rows
+- Reads `groups.identity.karectl.io` CRs with analyst/researcher membership → assigns `researcher` `ProjectMembership`; checker roles are trevor-internal and not derived from Group CRDs
 
 `validate_no_role_conflict()` prevents a user from being both researcher and checker on the same project ([C-04](spec/constraints.md)). Checked before every membership create.
 
@@ -94,7 +111,7 @@ src/trevor/
   database.py              # async engine, session factory, get_session dep
   auth.py                  # AuthContext dep, DEV_AUTH_BYPASS, require_admin
   storage.py               # aioboto3 S3 abstraction
-  worker.py                # ARQ WorkerSettings, agent_review_job, release_job
+  worker.py                # ARQ WorkerSettings, agent_review_job, release_job, send_notifications_job, crd_sync_job
   agent/
     rules.py               # statbarn rule engine (9 rules, pure functions)
     agent.py               # Pydantic-AI agent orchestration + LLM narrative
@@ -105,6 +122,7 @@ src/trevor/
     project.py             # Project, ProjectMembership, ProjectRole
     request.py             # AirlockRequest, OutputObject, OutputObjectMetadata, AuditEvent
     review.py              # Review, ReviewerType, ReviewDecision
+    notification.py        # Notification, NotificationEventType
   schemas/                 # Pydantic read/write schemas for each model
   services/
     user_service.py        # upsert_user
@@ -112,6 +130,8 @@ src/trevor/
     audit_service.py       # emit() helper
     release_service.py     # RO-Crate assembly, zip building
     metrics_service.py     # admin dashboard queries, pipeline metrics
+    notification_service.py  # NotificationEvent, InAppBackend, NotificationRouter, get_router
+    crd_sync_service.py    # CRD reconcile logic (projects, users, researcher memberships)
   routers/
     users.py               # /users/me
     projects.py            # /projects
@@ -119,16 +139,20 @@ src/trevor/
     requests.py            # /requests (CRUD + submit + upload)
     reviews.py             # /requests/{id}/reviews
     releases.py            # /requests/{id}/release
+    notifications.py       # /notifications (list, unread-count, mark-read)
     admin.py               # /admin (requests, metrics, audit)
-    ui.py                  # /ui (Datastar HTML views)
+    ui.py                  # /ui (Datastar HTML views, including /ui/notifications)
   templates/               # Jinja2 templates for Datastar UI
   static/                  # CSS (no JS build step)
 tests/
   conftest.py              # fixtures: in-memory SQLite, clients, sample data
-  test_*.py                # 111 tests across 12 test files
+  test_*.py                # 195 tests across 14 test files
 alembic/                   # async Alembic config + migrations
 docs/                      # this documentation (zensical)
 helm/trevor/               # Helm chart skeleton
+deploy/dev/
+  crds/                    # CRD schema definitions
+  sample-project/          # Interstellar project CRs + dev user/group CRs
 ```
 
 ## Environment variables
@@ -150,5 +174,6 @@ helm/trevor/               # Helm chart skeleton
 | `AGENT_MODEL_NAME` | LLM model | `gpt-4o` |
 | `AGENT_API_KEY` | LLM API key | — |
 | `AGENT_LLM_ENABLED` | Enable LLM calls | `false` |
+| `NOTIFICATIONS_ENABLED` | Enable in-app notifications | `true` |
 | `STUCK_REQUEST_HOURS` | SLA threshold | `72` |
 | `PRESIGNED_URL_TTL` | Release URL TTL (seconds) | `604800` (7 days) |

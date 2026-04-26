@@ -74,12 +74,12 @@ Active while Tilt is running:
 
 All test users have password `password` and are created automatically in Keycloak from `deploy/dev/keycloak-realm.yaml` on first Keycloak startup.
 
-| Username | Role | Notes |
+| Username | Role | Project |
 |---|---|---|
-| `researcher-1` | researcher | Member of `lancs-tre-proj-1` |
-| `checker-1` | output_checker | Member of `lancs-tre-proj-1` |
-| `checker-2` | output_checker + senior_checker | Member of `lancs-tre-proj-1` |
-| `admin-user` | tre_admin | Global admin via Keycloak realm role |
+| `researcher-1` | researcher | Interstellar |
+| `checker-1` | output_checker | Interstellar |
+| `checker-2` | output_checker + senior_checker | Interstellar |
+| `admin-user` | tre_admin | — (global admin via Keycloak realm role) |
 
 These users are seeded into postgres by the `seed-dev-db` Tilt resource, which runs automatically after trevor and Keycloak are healthy. You can also run it manually:
 
@@ -107,10 +107,12 @@ Key variables and their defaults for the Tilt stack:
 
 ### CR8TOR sample project
 
-Tilt automatically applies KARECTL CRD definitions and a sample project (`lancs-tre-proj-1`) with one user (`hardingmp`) and group memberships. These live in:
+Tilt automatically applies KARECTL CRD definitions and the **Interstellar** development project with User and Group CRDs for all dev users. These live in:
 
-- `deploy/dev/crds/` — CustomResourceDefinition models (Project, User, Group, KeycloakClient, VDIInstance)
-- `deploy/dev/sample-project/` — CR instances for the sample project
+- `deploy/dev/crds/` — CustomResourceDefinition schemas (Project, User, Group, KeycloakClient, VDIInstance)
+- `deploy/dev/sample-project/` — CR instances: `project-interstellar.yaml`, `users-dev.yaml`, `group-interstellar-analyst.yaml`
+
+The Project CRD `spec.display_name` field is used as the human-readable project name in the UI. The CRD sync worker reconciles these into the postgres DB every 5 minutes; `seed-dev-db` also creates them immediately on startup so the project is available before the first sync fires.
 
 ```bash
 kubectl get projects,users,groups -n trevor-dev
@@ -139,7 +141,7 @@ uv run pytest -v       # tests (in-memory SQLite, no .env needed)
 Tests use in-memory SQLite with `DEV_AUTH_BYPASS=true`. No external services needed.
 
 ```bash
-uv run pytest -v                 # full suite (164 tests)
+uv run pytest -v                 # full suite (195 tests)
 uv run pytest tests/test_ui.py   # just UI tests
 uv run pytest -k "test_rules"    # just rule engine tests
 ```

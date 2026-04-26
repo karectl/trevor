@@ -79,6 +79,36 @@ All endpoints require authentication unless noted. In dev mode (`DEV_AUTH_BYPASS
 | `POST` | `/requests/{id}/deliver` | `tre_admin` | Deliver approved ingress to workspace (pre-signed GET URLs) |
 | `GET` | `/requests/{id}/delivery` | Member/Admin | Get delivery record |
 
+## Notifications
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/notifications/unread-count` | Any | Unread notification count (JSON or SSE signals for Datastar badge) |
+| `GET` | `/notifications` | Any | List notifications for current user (newest first, paginated via `limit` + `before`) |
+| `PATCH` | `/notifications/{id}/read` | Any | Mark a single notification as read |
+| `POST` | `/notifications/mark-all-read` | Any | Mark all notifications as read |
+
+### Query parameters for `GET /notifications`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | int | 20 | Max results (1–100) |
+| `before` | datetime | — | Return only notifications older than this timestamp (cursor pagination) |
+| `unread_only` | bool | false | Return only unread notifications |
+
+### Notification event types
+
+| Event type | Recipients | Trigger |
+|---|---|---|
+| `request.submitted` | All checkers on the project | Researcher submits a request |
+| `agent_review.ready` | All checkers on the project | Agent review job completes |
+| `request.changes_requested` | Submitter | Checker requests changes |
+| `request.approved` | Submitter | Request approved by checkers |
+| `request.rejected` | Submitter | Request rejected by checkers |
+| `request.released` | Submitter | Release job completes |
+| `presigned_url.expiring_soon` | Submitter | Download link near expiry (planned) |
+| `request.stuck` | Admins | Request exceeds SLA threshold (planned) |
+
 ## Audit
 
 | Method | Path | Auth | Description |
@@ -124,3 +154,6 @@ All UI routes return HTML via Jinja2 + Datastar. See [UI Guide](ui.md) for detai
 | `GET` | `/ui/admin/memberships/{pid}` | `tre_admin` | Membership management |
 | `POST` | `/ui/admin/memberships` | `tre_admin` | Create membership via UI |
 | `POST` | `/ui/admin/memberships/{mid}/delete` | `tre_admin` | Delete membership via UI |
+| `GET` | `/ui/notifications` | Any | Notification inbox |
+| `POST` | `/ui/notifications/{id}/read` | Any | Mark notification read (form POST) |
+| `POST` | `/ui/notifications/mark-all-read` | Any | Mark all read (form POST) |

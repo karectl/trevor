@@ -27,7 +27,7 @@ The same workflow applies in reverse for **ingress** — bringing external data 
 
 ## Current status
 
-Iterations 0–11 are complete. The system has:
+Iterations 0–14 are complete. The system has:
 
 - Full request lifecycle (create, upload, submit, review, revise, release)
 - Autonomous agent review with 9 statbarn rules
@@ -35,10 +35,12 @@ Iterations 0–11 are complete. The system has:
 - Object versioning and metadata management
 - RO-Crate assembly and pre-signed URL delivery
 - Admin dashboard with pipeline metrics and audit log
+- In-app notification system (bell badge, notification inbox, mark-read)
+- CRD sync reconciler — projects and users synced from CR8TOR CRDs every 5 minutes
 - Datastar-powered UI for all roles (researcher, checker, admin)
 - Local development environment (devcontainer, bare-metal scripts, Tiltfile, SeaweedFS, Keycloak, PostgreSQL, Redis)
 - Production-ready Helm chart (Service, Ingress, HPA, PDB, NetworkPolicy, Worker, migration Job, NOTES.txt)
-- **138 tests passing**
+- **195 tests passing**
 
 See the [iteration plan](spec/iteration-plan.md) for what's next.
 
@@ -46,7 +48,7 @@ See the [iteration plan](spec/iteration-plan.md) for what's next.
 
 ```bash
 uv sync                    # install dependencies
-uv run pytest -v           # run tests (138 passing, no external deps needed)
+uv run pytest -v           # run tests (195 passing, no external deps needed)
 uv run trevor              # run app (uvicorn on :8000)
 uv run zensical serve      # serve these docs
 ```
