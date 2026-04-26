@@ -48,7 +48,8 @@ nav.topnav {
   background: var(--surface); border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
-nav.topnav .brand { font-weight: 700; font-size: 1.1rem; color: var(--text); }
+nav.topnav .brand { font-weight: 700; font-size: 1.1rem; color: var(--text); display: flex; align-items: center; gap: .4rem; }
+nav.topnav .brand-icon { height: 1.5rem; width: auto; display: block; }
 nav.topnav .spacer { flex: 1; }
 nav.topnav .nav-links { display: flex; gap: 1rem; }
 nav.topnav .nav-links a { color: var(--text-muted); font-size: .875rem; }
