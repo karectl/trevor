@@ -801,3 +801,264 @@ async def admin_membership_delete(
     await session.delete(membership)
     await session.commit()
     return RedirectResponse(f"/ui/admin/memberships/{project_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Ingress admin views
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ingress/new", response_class=HTMLResponse)
+async def ingress_create_form(
+    request: Request,
+    auth: RequireAdmin,
+    session: Session,
+) -> HTMLResponse:
+    projects = await _user_projects(auth.user.id, session, is_admin=auth.is_admin)
+    ctx = _base_ctx(request, auth)
+    ctx["projects"] = projects
+    return templates.TemplateResponse("admin/ingress_create.html", ctx)
+
+
+@router.post("/requests/ingress", response_class=HTMLResponse)
+async def ingress_create(
+    request: Request,
+    auth: RequireAdmin,
+    session: Session,
+    project_id: Annotated[str, Form()],
+    title: Annotated[str, Form()],
+    description: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    req = AirlockRequest(
+        project_id=uuid.UUID(project_id),
+        direction=AirlockDirection.INGRESS,
+        title=title,
+        description=description,
+        submitted_by=auth.user.id,
+    )
+    session.add(req)
+    await audit_service.emit(
+        session,
+        event_type="request.created",
+        actor_id=str(auth.user.id),
+        request_id=req.id,
+        payload={"direction": "ingress", "title": title},
+    )
+    await session.commit()
+    return RedirectResponse(f"/ui/requests/{req.id}/ingress-upload", status_code=303)
+
+
+@router.get("/requests/{request_id}/ingress-upload", response_class=HTMLResponse)
+async def ingress_upload_manage(
+    request: Request,
+    request_id: uuid.UUID,
+    auth: RequireAdmin,
+    session: Session,
+) -> HTMLResponse:
+    req = await session.get(AirlockRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404)
+    if req.direction != AirlockDirection.INGRESS:
+        raise HTTPException(status_code=409, detail="Not an ingress request")
+
+    obj_result = await session.exec(
+        select(OutputObject)
+        .where(OutputObject.request_id == request_id)
+        .order_by(OutputObject.uploaded_at)
+    )
+    objects = list(obj_result.all())
+
+    ctx = _base_ctx(request, auth)
+    ctx.update(airlock_request=req, objects=objects, output_types=[t.value for t in OutputType])
+    return templates.TemplateResponse("admin/ingress_upload.html", ctx)
+
+
+@router.post("/requests/{request_id}/ingress-upload", response_class=HTMLResponse)
+async def ingress_add_object_slot(
+    request: Request,
+    request_id: uuid.UUID,
+    auth: RequireAdmin,
+    session: Session,
+    filename: Annotated[str, Form()],
+    output_type: Annotated[str, Form()],
+) -> RedirectResponse:
+    req = await session.get(AirlockRequest, request_id)
+    if not req or req.direction != AirlockDirection.INGRESS:
+        raise HTTPException(status_code=409)
+
+    logical_object_id = uuid.uuid4()
+    object_id = uuid.uuid4()
+    storage_key = f"{req.project_id}/{req.id}/{logical_object_id}/1/{object_id}-{filename}"
+
+    obj = OutputObject(
+        id=object_id,
+        request_id=request_id,
+        version=1,
+        logical_object_id=logical_object_id,
+        filename=filename,
+        output_type=OutputType(output_type),
+        statbarn="",
+        storage_key=storage_key,
+        checksum_sha256="",
+        size_bytes=0,
+        uploaded_by=auth.user.id,
+    )
+    session.add(obj)
+    meta = OutputObjectMetadata(logical_object_id=logical_object_id)
+    session.add(meta)
+    await audit_service.emit(
+        session,
+        event_type="object.slot_created",
+        actor_id=str(auth.user.id),
+        request_id=request_id,
+        payload={"filename": filename, "object_id": str(object_id)},
+    )
+    await session.commit()
+    return RedirectResponse(f"/ui/requests/{request_id}/ingress-upload", status_code=303)
+
+
+@router.post(
+    "/requests/{request_id}/objects/{object_id}/generate-url",
+    response_class=HTMLResponse,
+)
+async def ingress_generate_url(
+    request: Request,
+    request_id: uuid.UUID,
+    object_id: uuid.UUID,
+    auth: RequireAdmin,
+    session: Session,
+    settings: SettingsDep,
+) -> HTMLResponse:
+    req = await session.get(AirlockRequest, request_id)
+    obj = await session.get(OutputObject, object_id)
+    if not req or not obj or obj.request_id != request_id:
+        raise HTTPException(status_code=404)
+
+    from datetime import UTC, datetime
+
+    if settings.dev_auth_bypass:
+        upload_url = f"https://mock-s3.example.com/{obj.storage_key}?presigned=put"
+    else:
+        from trevor.storage import generate_presigned_put_url
+
+        upload_url = await generate_presigned_put_url(
+            bucket=settings.s3_quarantine_bucket,
+            key=obj.storage_key,
+            expires_in=3600,
+            settings=settings,
+        )
+
+    obj.upload_url_generated_at = datetime.now(UTC).replace(tzinfo=None)
+    session.add(obj)
+    await audit_service.emit(
+        session,
+        event_type="object.upload_url_generated",
+        actor_id=str(auth.user.id),
+        request_id=request_id,
+        payload={"object_id": str(object_id)},
+    )
+    await session.commit()
+
+    ctx = _base_ctx(request, auth)
+    ctx.update(upload_url=upload_url, object=obj, request_id=request_id)
+    return templates.TemplateResponse("admin/ingress_upload_url.html", ctx)
+
+
+@router.post(
+    "/requests/{request_id}/objects/{object_id}/confirm",
+    response_class=HTMLResponse,
+)
+async def ingress_confirm_upload(
+    request: Request,
+    request_id: uuid.UUID,
+    object_id: uuid.UUID,
+    auth: RequireAdmin,
+    session: Session,
+    settings: SettingsDep,
+) -> RedirectResponse:
+    import hashlib
+
+    req = await session.get(AirlockRequest, request_id)
+    obj = await session.get(OutputObject, object_id)
+    if not req or not obj or obj.request_id != request_id:
+        raise HTTPException(status_code=404)
+    if obj.upload_url_generated_at is None:
+        raise HTTPException(status_code=409, detail="Upload URL not yet generated")
+
+    if settings.dev_auth_bypass:
+        obj.checksum_sha256 = hashlib.sha256(obj.storage_key.encode()).hexdigest()
+        obj.size_bytes = 1024
+    else:
+        from trevor.storage import download_object, head_object
+
+        meta = await head_object(
+            bucket=settings.s3_quarantine_bucket,
+            key=obj.storage_key,
+            settings=settings,
+        )
+        obj.size_bytes = meta["content_length"]
+        raw = await download_object(
+            bucket=settings.s3_quarantine_bucket,
+            key=obj.storage_key,
+            settings=settings,
+        )
+        obj.checksum_sha256 = hashlib.sha256(raw).hexdigest()
+
+    session.add(obj)
+    await audit_service.emit(
+        session,
+        event_type="object.upload_confirmed",
+        actor_id=str(auth.user.id),
+        request_id=request_id,
+        payload={"object_id": str(object_id), "checksum_sha256": obj.checksum_sha256},
+    )
+    await session.commit()
+    return RedirectResponse(f"/ui/requests/{request_id}/ingress-upload", status_code=303)
+
+
+@router.post("/requests/{request_id}/deliver", response_class=HTMLResponse)
+async def ingress_deliver(
+    request: Request,
+    request_id: uuid.UUID,
+    auth: RequireAdmin,
+    session: Session,
+    settings: SettingsDep,
+) -> RedirectResponse:
+    from datetime import UTC, datetime
+
+    from trevor.models.release import DeliveryRecord
+
+    req = await session.get(AirlockRequest, request_id)
+    if not req or req.direction != AirlockDirection.INGRESS:
+        raise HTTPException(status_code=409)
+    if req.status != AirlockRequestStatus.APPROVED:
+        raise HTTPException(status_code=409)
+
+    objects_result = await session.exec(
+        select(OutputObject).where(
+            OutputObject.request_id == request_id,
+            OutputObject.state == OutputObjectState.APPROVED,
+        )
+    )
+    approved_objects = list(objects_result.all())
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    record = DeliveryRecord(
+        request_id=request_id,
+        delivered_at=now,
+        delivered_by=auth.user.id,
+        delivery_metadata={"object_count": len(approved_objects)},
+    )
+    session.add(record)
+    req.status = AirlockRequestStatus.RELEASED
+    req.closed_at = now
+    session.add(req)
+    await audit_service.emit(
+        session,
+        event_type="request.released",
+        actor_id=str(auth.user.id),
+        request_id=request_id,
+        payload={"delivery_record_id": str(record.id)},
+    )
+    await session.commit()
+    return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)

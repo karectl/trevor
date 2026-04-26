@@ -14,6 +14,7 @@ from trevor.auth import CurrentAuth
 from trevor.database import get_session
 from trevor.models.project import Project, ProjectMembership, ProjectRole, ProjectStatus
 from trevor.models.request import (
+    AirlockDirection,
     AirlockRequest,
     AirlockRequestStatus,
     AuditEvent,
@@ -78,13 +79,35 @@ async def _assert_researcher(
         raise HTTPException(status_code=403, detail="Researcher role required")
 
 
+async def _assert_ingress_creator(
+    project_id: uuid.UUID, user_id: uuid.UUID, is_admin: bool, session: AsyncSession
+) -> None:
+    """Admin or senior_checker on project can create ingress requests."""
+    if is_admin:
+        return
+    result = await session.exec(
+        select(ProjectMembership).where(
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.user_id == user_id,
+            ProjectMembership.role == ProjectRole.SENIOR_CHECKER,
+        )
+    )
+    if result.first() is None:
+        raise HTTPException(
+            status_code=403, detail="Admin or senior_checker role required for ingress"
+        )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=RequestRead)
 async def create_request(
     body: RequestCreate,
     auth: CurrentAuth,
     session: Session,
 ) -> AirlockRequest:
-    await _assert_researcher(body.project_id, auth.user.id, session)
+    if body.direction == AirlockDirection.EGRESS:
+        await _assert_researcher(body.project_id, auth.user.id, session)
+    else:
+        await _assert_ingress_creator(body.project_id, auth.user.id, auth.is_admin, session)
     req = AirlockRequest(
         project_id=body.project_id,
         direction=body.direction,
@@ -207,43 +230,55 @@ async def upload_object(
     auth: CurrentAuth,
     session: Session,
     settings: SettingsDep,
-    file: UploadFile,
     output_type: Annotated[OutputType, Form()],
+    file: UploadFile | None = None,
+    filename: Annotated[str, Form()] = "",
     statbarn: Annotated[str, Form()] = "",
 ) -> OutputObject:
     req = await _get_request_or_404(request_id, session)
     if req.status != AirlockRequestStatus.DRAFT:
         raise HTTPException(status_code=409, detail="Request not in DRAFT state")
-    await _assert_researcher(req.project_id, auth.user.id, session)
 
-    raw = await file.read()
-    checksum = hashlib.sha256(raw).hexdigest()
-    size = len(raw)
+    if req.direction == AirlockDirection.EGRESS:
+        await _assert_researcher(req.project_id, auth.user.id, session)
+        if file is None:
+            raise HTTPException(status_code=422, detail="File required for egress upload")
+    else:
+        await _assert_ingress_creator(req.project_id, auth.user.id, auth.is_admin, session)
 
     logical_object_id = uuid.uuid4()
     version = 1
     object_id = uuid.uuid4()
+    effective_filename = (file.filename if file else filename) or "unknown"
     storage_key = (
-        f"{req.project_id}/{req.id}/{logical_object_id}/{version}/{object_id}-{file.filename}"
+        f"{req.project_id}/{req.id}/{logical_object_id}/{version}/{object_id}-{effective_filename}"
     )
 
-    if not settings.dev_auth_bypass:
-        from trevor.storage import upload_fileobj
+    if file is not None:
+        raw = await file.read()
+        checksum = hashlib.sha256(raw).hexdigest()
+        size = len(raw)
+        if not settings.dev_auth_bypass:
+            from trevor.storage import upload_fileobj
 
-        await upload_fileobj(
-            bucket=settings.s3_quarantine_bucket,
-            key=storage_key,
-            fileobj=io.BytesIO(raw),
-            content_type=file.content_type or "application/octet-stream",
-            settings=settings,
-        )
+            await upload_fileobj(
+                bucket=settings.s3_quarantine_bucket,
+                key=storage_key,
+                fileobj=io.BytesIO(raw),
+                content_type=file.content_type or "application/octet-stream",
+                settings=settings,
+            )
+    else:
+        # Ingress placeholder: awaiting external upload via pre-signed PUT
+        checksum = ""
+        size = 0
 
     obj = OutputObject(
         id=object_id,
         request_id=request_id,
         version=version,
         logical_object_id=logical_object_id,
-        filename=file.filename or "unknown",
+        filename=effective_filename,
         output_type=output_type,
         statbarn=statbarn,
         storage_key=storage_key,
@@ -263,7 +298,7 @@ async def upload_object(
         request_id=request_id,
         payload={
             "object_id": str(object_id),
-            "filename": file.filename,
+            "filename": effective_filename,
             "checksum_sha256": checksum,
             "size_bytes": size,
         },

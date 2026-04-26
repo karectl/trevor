@@ -8,7 +8,17 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from trevor.database import create_db_and_tables, get_engine
-from trevor.routers import admin, memberships, projects, releases, requests, reviews, ui, users
+from trevor.routers import (
+    admin,
+    deliveries,
+    memberships,
+    projects,
+    releases,
+    requests,
+    reviews,
+    ui,
+    users,
+)
 from trevor.settings import Settings, get_settings
 
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -49,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(requests.router)
     app.include_router(reviews.router)
     app.include_router(releases.router)
+    app.include_router(deliveries.router)
     app.include_router(admin.router)
     app.include_router(ui.router)
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

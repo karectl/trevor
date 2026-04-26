@@ -1,7 +1,7 @@
 """trevor domain models."""
 
 from trevor.models.project import Project, ProjectMembership, ProjectRole, ProjectStatus
-from trevor.models.release import ReleaseRecord
+from trevor.models.release import DeliveryRecord, ReleaseRecord
 from trevor.models.request import (
     AirlockDirection,
     AirlockRequest,
@@ -16,6 +16,7 @@ from trevor.models.review import Review, ReviewDecision, ReviewerType
 from trevor.models.user import User
 
 __all__ = [
+    "DeliveryRecord",
     "AirlockDirection",
     "AirlockRequest",
     "AirlockRequestStatus",
@@ -29,6 +30,7 @@ __all__ = [
     "ProjectRole",
     "ProjectStatus",
     "ReleaseRecord",
+    "DeliveryRecord",
     "Review",
     "ReviewDecision",
     "ReviewerType",

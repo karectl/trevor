@@ -92,3 +92,37 @@ async def generate_presigned_get_url(
             ExpiresIn=expires_in,
         )
     return url
+
+
+async def generate_presigned_put_url(
+    *,
+    bucket: str,
+    key: str,
+    content_type: str = "application/octet-stream",
+    expires_in: int = 3600,
+    settings: Settings | None = None,
+) -> str:
+    """Return a pre-signed PUT URL for external upload to quarantine (ingress)."""
+    async with s3_client(settings) as client:
+        url: str = await client.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": bucket, "Key": key, "ContentType": content_type},
+            ExpiresIn=expires_in,
+        )
+    return url
+
+
+async def head_object(
+    *,
+    bucket: str,
+    key: str,
+    settings: Settings | None = None,
+) -> dict:
+    """HEAD object — returns content_length, etag, content_type."""
+    async with s3_client(settings) as client:
+        response = await client.head_object(Bucket=bucket, Key=key)
+    return {
+        "content_length": response.get("ContentLength", 0),
+        "etag": response.get("ETag", ""),
+        "content_type": response.get("ContentType", ""),
+    }

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Upload URL — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Pre-signed Upload URL</h1>
+  <p>Share this URL with the external submitter. It expires in 1 hour.</p>
+</div>
+<div class="upload-url-panel">
+  <label>File: <strong>{{ object.filename }}</strong></label>
+  <div class="form-group">
+    <label>Upload URL (PUT)</label>
+    <textarea class="url-display" rows="4" readonly onclick="this.select()">{{ upload_url }}</textarea>
+    <small>External party must HTTP PUT the file directly to this URL.</small>
+  </div>
+  <div class="form-group">
+    <label>Storage Key</label>
+    <code>{{ object.storage_key }}</code>
+  </div>
+  <div class="form-actions">
+    <a href="/ui/requests/{{ request_id }}/ingress-upload" class="btn btn-primary">Back to Upload Management</a>
+  </div>
+</div>
+{% endblock %}

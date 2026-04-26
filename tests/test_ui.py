@@ -135,3 +135,60 @@ async def test_admin_requires_auth(client: AsyncClient) -> None:
     """Non-admin client should get 403 on admin pages."""
     r = await client.get("/ui/admin")
     assert r.status_code == 403
+
+
+@pytest.mark.anyio
+async def test_ingress_create_form(admin_client: AsyncClient) -> None:
+    r = await admin_client.get("/ui/ingress/new")
+    assert r.status_code == 200
+    assert "New Ingress Request" in r.text
+
+
+@pytest.mark.anyio
+async def test_ingress_create_and_upload_manage(admin_client: AsyncClient, db_session) -> None:
+    from trevor.models.project import Project
+
+    project = Project(crd_name="ingress-ui-proj", display_name="Ingress UI Proj")
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+
+    r = await admin_client.post(
+        "/ui/requests/ingress",
+        data={"project_id": str(project.id), "title": "UI ingress test"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    upload_url = r.headers["location"]
+    assert "ingress-upload" in upload_url
+
+    r2 = await admin_client.get(upload_url)
+    assert r2.status_code == 200
+    assert "Ingress Upload" in r2.text
+
+
+@pytest.mark.anyio
+async def test_ingress_add_object_slot_via_ui(admin_client: AsyncClient, db_session) -> None:
+    from trevor.models.project import Project
+
+    project = Project(crd_name="ingress-slot-proj", display_name="Ingress Slot Proj")
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+
+    r = await admin_client.post(
+        "/ui/requests/ingress",
+        data={"project_id": str(project.id), "title": "Slot test"},
+        follow_redirects=True,
+    )
+    req_id = r.url.path.split("/")[-2]  # /ui/requests/{id}/ingress-upload
+
+    r2 = await admin_client.post(
+        f"/ui/requests/{req_id}/ingress-upload",
+        data={"filename": "import.csv", "output_type": "tabular"},
+        follow_redirects=False,
+    )
+    assert r2.status_code == 303
+
+    r3 = await admin_client.get(f"/ui/requests/{req_id}/ingress-upload")
+    assert "import.csv" in r3.text

@@ -79,6 +79,7 @@ class OutputObject(SQLModel, table=True):
     state: OutputObjectState = Field(default=OutputObjectState.PENDING)
     uploaded_at: datetime = Field(default_factory=_utcnow)
     uploaded_by: uuid.UUID = Field(foreign_key="users.id")
+    upload_url_generated_at: datetime | None = Field(default=None)
 
 
 class OutputObjectMetadata(SQLModel, table=True):

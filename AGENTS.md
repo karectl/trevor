@@ -250,8 +250,12 @@ Agent settings (planned):
 | `POST` | `/requests/{id}/objects/{oid}/replace` | Researcher | Upload replacement object |
 | `POST` | `/requests/{id}/resubmit` | Owner/Admin | Resubmit after changes |
 | `GET` | `/requests/{id}/objects/{oid}/versions` | Member/Admin | List object version history |
-| `POST` | `/requests/{id}/release` | `tre_admin` | Trigger release (RO-Crate assembly) |
+| `POST` | `/requests/{id}/release` | `tre_admin` | Trigger release (RO-Crate assembly, egress) |
 | `GET` | `/requests/{id}/release` | Member/Admin | Get release record |
+| `POST` | `/requests/{id}/objects/{oid}/upload-url` | Admin/Senior | Generate pre-signed PUT URL (ingress) |
+| `POST` | `/requests/{id}/objects/{oid}/confirm-upload` | Admin/Senior | Confirm ingress upload, compute checksum |
+| `POST` | `/requests/{id}/deliver` | `tre_admin` | Deliver approved ingress to workspace |
+| `GET` | `/requests/{id}/delivery` | Member/Admin | Get ingress delivery record |
 | `GET` | `/admin/requests` | Admin/Senior | All-projects request overview |
 | `GET` | `/admin/metrics` | Admin/Senior | Pipeline metrics + stuck detection |
 | `GET` | `/admin/audit` | `tre_admin` | Filterable audit log |
@@ -266,6 +270,12 @@ Agent settings (planned):
 | `POST` | `/ui/requests/{id}/submit` | Owner/Admin | Submit via UI |
 | `POST` | `/ui/requests/{id}/resubmit` | Owner/Admin | Resubmit via UI |
 | `POST` | `/ui/requests/{id}/release` | `tre_admin` | Release via UI |
+| `GET` | `/ui/ingress/new` | Admin/Senior | Ingress request creation form (HTML) |
+| `POST` | `/ui/requests/ingress` | Admin/Senior | Create ingress request via form |
+| `GET/POST` | `/ui/requests/{id}/ingress-upload` | Admin/Senior | Manage ingress object slots |
+| `POST` | `/ui/requests/{id}/objects/{oid}/generate-url` | Admin/Senior | Generate upload URL via UI |
+| `POST` | `/ui/requests/{id}/objects/{oid}/confirm` | Admin/Senior | Confirm upload via UI |
+| `POST` | `/ui/requests/{id}/deliver` | `tre_admin` | Deliver ingress request via UI |
 | `GET` | `/ui/review` | Checker/Admin | Review queue (HTML) |
 | `GET/POST` | `/ui/review/{id}` | Checker/Admin | Review form + submit |
 | `GET` | `/ui/admin` | `tre_admin` | Admin request overview (HTML) |

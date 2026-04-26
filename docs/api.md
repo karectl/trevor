@@ -67,8 +67,17 @@ All endpoints require authentication unless noted. In dev mode (`DEV_AUTH_BYPASS
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/requests/{id}/release` | `tre_admin` | Trigger release (RO-Crate assembly) |
+| `POST` | `/requests/{id}/release` | `tre_admin` | Trigger release (RO-Crate assembly, egress) |
 | `GET` | `/requests/{id}/release` | Member/Admin | Get release record |
+
+## Ingress Delivery
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/requests/{id}/objects/{oid}/upload-url` | Admin/Senior | Generate pre-signed PUT URL for external upload |
+| `POST` | `/requests/{id}/objects/{oid}/confirm-upload` | Admin/Senior | Confirm upload, compute checksum |
+| `POST` | `/requests/{id}/deliver` | `tre_admin` | Deliver approved ingress to workspace (pre-signed GET URLs) |
+| `GET` | `/requests/{id}/delivery` | Member/Admin | Get delivery record |
 
 ## Audit
 
@@ -101,6 +110,12 @@ All UI routes return HTML via Jinja2 + Datastar. See [UI Guide](ui.md) for detai
 | `POST` | `/ui/requests/{id}/submit` | Owner/Admin | Submit via UI |
 | `POST` | `/ui/requests/{id}/resubmit` | Owner/Admin | Resubmit via UI |
 | `POST` | `/ui/requests/{id}/release` | `tre_admin` | Release via UI |
+| `GET` | `/ui/ingress/new` | Admin/Senior | Ingress request creation form |
+| `POST` | `/ui/requests/ingress` | Admin/Senior | Create ingress request via form |
+| `GET/POST` | `/ui/requests/{id}/ingress-upload` | Admin/Senior | Manage ingress object slots |
+| `POST` | `/ui/requests/{id}/objects/{oid}/generate-url` | Admin/Senior | Generate upload URL via UI |
+| `POST` | `/ui/requests/{id}/objects/{oid}/confirm` | Admin/Senior | Confirm upload via UI |
+| `POST` | `/ui/requests/{id}/deliver` | `tre_admin` | Deliver ingress request via UI |
 | `GET` | `/ui/review` | Checker/Admin | Review queue |
 | `GET/POST` | `/ui/review/{id}` | Checker/Admin | Review form |
 | `GET` | `/ui/admin` | `tre_admin` | Admin request overview |

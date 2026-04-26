@@ -46,6 +46,7 @@ class OutputObjectRead(BaseModel):
     state: str
     uploaded_at: datetime
     uploaded_by: uuid.UUID
+    upload_url_generated_at: datetime | None
 
     model_config = {"from_attributes": True}
 
