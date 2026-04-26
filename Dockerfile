@@ -14,13 +14,15 @@ WORKDIR /app
 # ── deps layer ──────────────────────────────────────────────────────────────
 FROM base AS deps
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 # ── final image ─────────────────────────────────────────────────────────────
 FROM base AS final
 COPY --from=deps /usr/local/lib/python3.13 /usr/local/lib/python3.13
 COPY --from=deps /usr/local/bin /usr/local/bin
+COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
+RUN uv sync --frozen --no-dev --no-editable
 
 # Non-root user (C-07 / K8s best practice)
 RUN useradd --uid 1000 --no-create-home trevor

@@ -1,8 +1,19 @@
 # Tiltfile — trevor local dev on k3d/kind
 
-REGISTRY = "localhost:5005"
-IMAGE_NAME = REGISTRY + "/trevor"
 NAMESPACE = "trevor-dev"
+
+# Tilt pushes to localhost:5005 (host-accessible), but k3s pulls from
+# trevor-registry:5000 (container network DNS). host_from_cluster handles
+# the URL translation so containerd never tries HTTPS on a plain-HTTP registry.
+default_registry(
+    "localhost:5005",
+    host_from_cluster="trevor-registry:5000",
+)
+
+# IMAGE_NAME is the bare image name used in docker_build and Helm.
+# default_registry rewrites it: push to localhost:5005/trevor,
+# in-cluster pull from trevor-registry:5000/trevor.
+IMAGE_NAME = "trevor"
 
 # ── Docker image ─────────────────────────────────────────────────────────────
 docker_build(
