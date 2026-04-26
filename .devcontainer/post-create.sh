@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fix ownership of mount-created intermediate dirs (Docker creates them as root)
+sudo chown -R vscode:vscode /home/vscode/.local /home/vscode/.config 2>/dev/null || true
+
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
+
+# Install opencode
+curl -fsSL https://opencode.ai/install | bash
+export PATH="$HOME/.opencode/bin:$PATH"
+
+# Ensure opencode is on PATH for future terminal sessions
+if ! grep -q '.opencode/bin' "$HOME/.bashrc" 2>/dev/null; then
+  echo 'export PATH="$HOME/.opencode/bin:$PATH"' >> "$HOME/.bashrc"
+fi
 
 # Install k3d and tilt
 curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
@@ -16,6 +28,12 @@ fi
 
 # Python deps
 uv sync
+
+# Bootstrap .env from sample.env if not already present
+if [[ ! -f .env ]]; then
+  cp sample.env .env
+  echo "Created .env from sample.env — edit as needed."
+fi
 
 # Install prek pre-commit hooks (regenerates .git/hooks/pre-commit with correct venv path)
 uv run prek install
