@@ -17,6 +17,9 @@ fi
 # Python deps
 uv sync
 
+# Install prek pre-commit hooks (regenerates .git/hooks/pre-commit with correct venv path)
+uv run prek install
+
 # Create k3d cluster with local registry (skip if already exists).
 # Optional: set K3D_LB_HTTP_PORT to publish ingress HTTP from loadbalancer.
 if k3d cluster list | grep -q '^trevor-dev\b'; then
