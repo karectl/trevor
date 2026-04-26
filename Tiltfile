@@ -98,3 +98,13 @@ k8s_resource("postgres", port_forwards=["5432:5432"], labels=["infra"])
 k8s_resource("redis", port_forwards=["6379:6379"], labels=["infra"])
 k8s_resource("seaweedfs", port_forwards=["8333:8333", "9333:9333"], labels=["infra"])
 k8s_resource("keycloak", port_forwards=["8080:8080"], labels=["infra"])
+
+# ── Dev DB seed ───────────────────────────────────────────────────────────────
+# Upserts Keycloak test users + project memberships into postgres.
+# Runs once after trevor and keycloak are healthy.
+local_resource(
+    "seed-dev-db",
+    cmd="uv run python scripts/seed-dev-db.py",
+    resource_deps=["trevor-trevor", "keycloak"],
+    labels=["app"],
+)
