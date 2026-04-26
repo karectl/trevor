@@ -1,59 +1,45 @@
 # AGENTS.md — trevor
 
-Egress/airlock microservice for the KARECTL Trusted Research Environment (TRE). Manages controlled import/export of research outputs across the TRE security boundary.
+Egress/airlock microservice for the KARECTL TRE. Controls import/export of research outputs across the security boundary.
 
 ---
 
-## Toolchain
-
-| Tool | Version |
-|---|---|
-| Python | 3.13 (pinned in `.python-version`) |
-| Package manager | `uv` 0.11.2 |
-| Build backend | `uv_build` |
-| Linting/formatting | `ruff` (config in `pyproject.toml`) |
-| Pre-commit | `prek` (config in `pyproject.toml [tool.prek]`) |
-| Tests | `pytest` + `pytest-asyncio` (async mode auto) |
-
-All commands go through `uv`:
+## Commands
 
 ```bash
-uv sync                          # install / sync deps into .venv
-uv run trevor                    # run app (uvicorn on :8000)
-uv run pytest -v                 # run tests
-uv run ruff check .              # lint
-uv run ruff format .             # format
-uv run alembic upgrade head      # run migrations
-uv run alembic revision --autogenerate -m "description"  # generate migration
-uv run arq trevor.worker.WorkerSettings  # run ARQ worker
-uv run zensical serve             # Serve docs (mkdocs compatible alternative)
-uv run zensical build             # Build docs (mkdocs compatible alternative)
+uv sync                                              # install deps
+uv run trevor                                        # run app (:8000)
+uv run pytest -v                                     # run tests (195, no external deps)
+uv run ruff check . && uv run ruff format --check .  # lint + format check
+uv run ruff format .                                 # auto-format
+uv run alembic upgrade head                          # run migrations
+uv run alembic revision --autogenerate -m "desc"     # generate migration
+uv run arq trevor.worker.WorkerSettings              # run ARQ worker
+uv run zensical serve                                # serve docs
 ```
 
 No `make`, `just`, or `task` — `uv run` only.
 
 ---
 
-## Fixed technology stack (C-13 — deviations require a new ADR)
+## Fixed stack (C-13 — deviations require a new ADR)
 
 | Layer | Technology |
 |---|---|
-| Backend | FastAPI |
-| Validation | Pydantic v2 |
-| ORM | SQLModel |
-| Migrations | Alembic (async template, `aiosqlite` locally, `asyncpg` in prod) |
-| Linting/formatting | `ruff` |
-| Pre-commit | `prek` |
+| Backend | FastAPI + Pydantic v2 + SQLModel |
+| Migrations | Alembic (async; `aiosqlite` locally, `asyncpg` prod) |
 | Frontend | **Datastar** (hypermedia + SSE; no JS build step — not htmx, not React) |
 | Templating | Jinja2 |
-| Object storage client | `aioboto3` |
-| Task queue | ARQ (Async Redis Queue) |
-| Auth | Keycloak OIDC (`python-jose` for JWT; `DEV_AUTH_BYPASS` for tests) |
-| Orchestration | Kubernetes (Tilt + k3d/kind for local dev) |
-| Agent framework | Pydantic-AI (OpenAI-compatible backend) |
-| RO-Crate | `rocrate` Python library |
+| Object storage | `aioboto3` (S3-compatible) |
+| Task queue | ARQ (async Redis queue) |
+| Auth | Keycloak OIDC (`python-jose`; `DEV_AUTH_BYPASS` for tests) |
+| Orchestration | Kubernetes (Tilt + k3d for local dev) |
+| Agent | Pydantic-AI (OpenAI-compatible backend) |
+| RO-Crate | `rocrate` |
 | File preview | `mistune`, `polars`, `pygments` |
 | Notifications | In-app (`Notification` table, `InAppBackend`); SMTP planned (iter 15) |
+| Linting | `ruff` |
+| Pre-commit | `prek` |
 
 ---
 
@@ -61,134 +47,95 @@ No `make`, `just`, or `task` — `uv run` only.
 
 ```
 src/trevor/
-  __init__.py              # main() entrypoint → uvicorn
-  app.py                   # FastAPI factory, lifespan, router registration
-  settings.py              # pydantic-settings BaseSettings (all env vars)
-  database.py              # async engine (lru_cache by URL), session factory, get_session dep
-  auth.py                  # AuthContext dep, DEV_AUTH_BYPASS, require_admin
-  storage.py               # aioboto3 S3 abstraction (upload, download, presigned URLs)
-  worker.py                # ARQ WorkerSettings, agent_review_job, release_job, send_notifications_job, crd_sync_job
-  agent/
-    __init__.py
-    rules.py               # statbarn rule engine (pure functions, no I/O)
-    agent.py               # Pydantic-AI agent orchestration + LLM narrative
-    prompts.py             # system prompt, template-based narratives
-    schemas.py             # RuleResult, ObjectAssessment dataclasses
+  app.py            # FastAPI factory + lifespan (ARQ pool, SQLite table creation)
+  settings.py       # pydantic-settings BaseSettings — all env vars
+  database.py       # get_engine (lru_cache), get_session dep
+  auth.py           # AuthContext, CurrentAuth, RequireAdmin, DEV_AUTH_BYPASS
+  storage.py        # aioboto3 S3 — upload, download, presigned URLs
+  worker.py         # ARQ: agent_review_job, release_job, send_notifications_job, crd_sync_job
+  crd.py            # kubernetes client wrappers (list CRDs)
+  agent/            # rules.py (statbarn, pure), agent.py (Pydantic-AI), prompts.py, schemas.py
   models/
-    user.py                # User (synced from CRD + Keycloak; nullable keycloak_sub)
-    project.py             # Project, ProjectMembership, ProjectStatus, ProjectRole
-    request.py             # AirlockRequest, OutputObject, OutputObjectMetadata, AuditEvent
-    review.py              # Review, ReviewerType, ReviewDecision
-    notification.py        # Notification, NotificationEventType (8 event types)
-  schemas/
-    user.py                # UserRead, UserMeRead
-    project.py             # ProjectRead
-    membership.py          # MembershipCreate, MembershipRead
-    request.py             # RequestCreate/Read, OutputObjectRead, MetadataRead, AuditEventRead
-    review.py              # ReviewRead
-    release.py             # ReleaseRecordRead
-    notification.py        # NotificationRead, UnreadCountRead
+    user.py         # User
+    project.py      # Project, ProjectMembership, ProjectRole, ProjectStatus
+    request.py      # AirlockRequest, OutputObject, OutputObjectMetadata, AuditEvent
+    review.py       # Review, ReviewerType, ReviewDecision
+    notification.py # Notification, NotificationEventType (8 types)
+    release.py      # ReleaseRecord, DeliveryRecord
+  schemas/          # Pydantic read/write schemas mirroring models
   services/
-    user_service.py        # upsert_user (create/update from CRD sync or JWT claims)
-    membership_service.py  # CRUD + role conflict validation
-    audit_service.py       # emit() helper for AuditEvent
-    release_service.py     # assemble_and_release(), RO-Crate assembly, zip building
-    metrics_service.py     # admin dashboard queries, pipeline metrics
-    notification_service.py  # NotificationEvent, InAppBackend, NotificationRouter, get_recipients, create_event, get_router
-    crd_sync_service.py    # reconcile_projects, reconcile_users, reconcile_memberships (pure, no k8s dep)
+    user_service.py         # upsert_user
+    membership_service.py   # CRUD + validate_no_role_conflict
+    audit_service.py        # emit() — append-only AuditEvent
+    release_service.py      # assemble_and_release(), RO-Crate + zip
+    metrics_service.py      # admin dashboard queries
+    notification_service.py # NotificationEvent, InAppBackend, NotificationRouter, create_event, get_router
+    crd_sync_service.py     # reconcile_projects/users/memberships (pure, no k8s dep)
   routers/
-    users.py               # GET /users/me
-    projects.py            # GET /projects, GET /projects/{id}
-    memberships.py         # POST /memberships (admin), GET, DELETE
-    requests.py            # CRUD + submit + upload for AirlockRequest/OutputObject
-    reviews.py             # GET /requests/{id}/reviews
-    releases.py            # POST/GET /requests/{id}/release
-    notifications.py       # GET/PATCH /notifications + POST /notifications/mark-all-read
-    admin.py               # GET /admin/requests, /metrics, /audit, /audit/export
-    ui.py                  # Datastar HTML views: researcher, checker, admin, notifications
+    requests.py      # /requests — CRUD, submit, upload, replace, resubmit
+    reviews.py       # /requests/{id}/reviews
+    releases.py      # /requests/{id}/release
+    deliveries.py    # /requests/{id}/deliver + /delivery (ingress)
+    notifications.py # /notifications — list, unread-count, mark-read, mark-all-read
+    admin.py         # /admin — requests, metrics, audit, audit/export
+    ui.py            # /ui — all Datastar HTML views
+    users.py projects.py memberships.py auth_routes.py
   templates/
-    base.html              # Shell: head, nav, Datastar CDN, flash area
-    components/            # nav (with bell badge), flash, pagination, status_badge, file_preview
-    researcher/            # request_list, request_create, request_detail, object_upload, object_metadata, object_replace, revision_feedback
-    checker/               # review_queue, review_form
-    admin/                 # request_overview, metrics_dashboard, audit_log, membership_manage
-    notifications/         # list.html (notification inbox)
-  static/
-    style.css              # Minimal CSS (system fonts, custom properties, status colors, notification styles)
+    base.html         # shell + nav (bell badge) + Datastar CDN
+    components/       # nav, flash, pagination, status_badge, file_preview
+    researcher/       # request_list, _create, _detail, object_upload, _metadata, _replace, revision_feedback
+    checker/          # review_queue, review_form
+    admin/            # request_overview, metrics_dashboard, audit_log, membership_manage
+    notifications/    # list.html
+  static/style.css    # custom properties, status colours, notification styles
 tests/
-  conftest.py              # fixtures: in-memory SQLite, client, admin_client, sample data
-  test_health.py
-  test_users.py
-  test_projects.py
-  test_memberships.py
-  test_requests.py
-  test_rules.py            # statbarn rule engine unit tests
-  test_reviews.py          # agent review job + review endpoint tests
-  test_releases.py         # release endpoint + RO-Crate tests
-  test_admin.py            # admin dashboard + metrics endpoint tests
-  test_ui.py               # Datastar UI route tests
-  test_notifications.py    # notification service + API endpoint tests
-  test_crd_sync.py         # CRD sync reconciler tests
-alembic/                   # async Alembic config, migrations
-helm/trevor/               # Helm chart skeleton
+  conftest.py         # in-memory SQLite, client/admin_client fixtures, DEV_AUTH_BYPASS
+  test_*.py           # 195 tests across 14 files
+alembic/versions/     # async migrations
 deploy/dev/
-  crds/                    # CRD schema definitions (Project, User, Group, KeycloakClient, VDI)
-  sample-project/          # Interstellar project CR + dev user/group CRs
-.github/workflows/ci.yml   # lint → test → docker build
-Dockerfile                 # multi-stage, non-root user
-Tiltfile                   # k3d/kind local dev
-scripts/
-  seed-dev-db.py           # seeds Interstellar project + dev user memberships into postgres
-docs/
-  index.md                 # project home page
-  architecture.md          # system design, tech stack, patterns
-  api.md                   # full API endpoint reference
-  ui.md                    # UI guide: templates, views by role, Datastar patterns
-  guide/
-    index.md               # developer guide: setup, testing, migrations, git workflow
-  spec/                    # authoritative design docs (read before implementing)
-    constraints.md         # non-negotiable constraints (C-01 – C-13)
-    domain-model.md        # entity definitions, state machines, field-level detail
-    iteration-plan.md      # delivery plan; spec before code per iteration
-    glossary.md
-    adrs/                  # 0001-*.md … 0016-*.md — Architecture Decision Records
-    iterations/            # per-iteration specs (iter-1.md … iter-14.md)
-spec -> docs/spec          # symlink for backward compatibility
+  crds/               # CRD schemas (Project, User, Group, KeycloakClient, VDI)
+  sample-project/     # Interstellar Project CR + dev User/Group CRs
+scripts/seed-dev-db.py  # seeds Interstellar project + dev memberships into postgres
+helm/trevor/          # production Helm chart
+Dockerfile            # multi-stage, non-root
+Tiltfile              # local dev orchestration
+docs/                 # architecture.md, api.md, ui.md, guide/, spec/
 ```
-
-**Spec-first rule**: each iteration requires writing OpenAPI paths and DB migration spec *before* implementation. Check `docs/spec/iteration-plan.md` for what to spec next.
 
 ---
 
 ## Architecture patterns
 
-- **App factory**: `create_app(settings)` in `app.py`. Module-level `app = create_app()` for uvicorn.
-- **Dependency injection**: `get_session`, `get_settings`, `get_auth_context` are FastAPI deps. Tests override via `app.dependency_overrides`.
-- **Engine caching**: `get_engine(url)` is `@lru_cache` — one engine per URL. Tests use `sqlite+aiosqlite:///:memory:`.
-- **Auth**: `AuthContext` dataclass holds `User` (DB model) + `realm_roles` + `is_admin`. `CurrentAuth` type alias for Depends injection. `RequireAdmin` chains admin check.
-- **User upsert**: on every authed request, `upsert_user()` creates/updates User shadow record from Keycloak claims. Users may also be pre-created from CRD sync with nullable `keycloak_sub`. Keycloak is source of truth for identity (C-10).
-- **Role conflict enforcement**: `validate_no_role_conflict()` prevents researcher + checker on same project (C-04). Checked before every membership create.
+- **App factory**: `create_app(settings)` in `app.py`. Lifespan opens ARQ pool; closes on shutdown.
+- **Deps**: `get_session`, `get_settings`, `get_auth_context`. Tests override via `app.dependency_overrides`.
+- **Auth**: `AuthContext` = `User` + `realm_roles` + `is_admin`. `tre_admin` read from JWT on every request — not cached.
+- **User upsert**: every authed request calls `upsert_user()` from JWT claims. Users can also be pre-created by CRD sync (`keycloak_sub` nullable until first login).
+- **Role conflict**: `validate_no_role_conflict()` — researcher and checker cannot share a project (C-04).
+- **Audit**: `audit_service.emit()` — append-only, never UPDATE/DELETE (C-05).
+- **Notifications**: `send_notifications_job` (ARQ) resolves recipients, builds `NotificationEvent`, dispatches via `NotificationRouter`. Fired by submit, agent_review_job, release_job.
+- **CRD sync**: `crd_sync_job` ARQ cron every 5 min. Reads Project/User/Group CRDs → upserts DB rows. `display_name` = `spec.display_name` → `spec.description` → `metadata.name`. Checker roles are trevor-internal (not from CRDs).
+- **Migrations**: Alembic autogenerate on SQLite often misses `import sqlmodel` and detects phantom `projects.status` enum changes — fix manually. Use `op.batch_alter_table()` for SQLite ALTER.
 
 ---
 
-## Non-negotiable constraints (abbreviated — read `docs/spec/constraints.md` for full text)
+## Constraints (abbreviated — full text: `docs/spec/constraints.md`)
 
-- **C-02**: Researchers never hold S3 credentials. trevor is the sole storage proxy.
-- **C-03**: `OutputObject` is immutable after submission. SHA-256 checksum verified at every state transition. No PUT/DELETE/PATCH on file content.
-- **C-04**: Every request needs exactly 2 distinct reviewers before approval. Submitter cannot review. Researcher cannot check their own project.
-- **C-05**: `AuditEvent` table is append-only. No UPDATE or DELETE ever.
-- **C-06**: trevor never writes Kubernetes CRDs — project data is read-only from CR8TOR.
+- **C-02**: Researchers never hold S3 credentials — trevor proxies all storage.
+- **C-03**: `OutputObject` immutable after submission. SHA-256 verified at every transition.
+- **C-04**: 2 distinct reviewers required. Submitter cannot review their own request.
+- **C-05**: `AuditEvent` append-only — no UPDATE or DELETE ever.
+- **C-06**: trevor never writes CRDs — read-only from CR8TOR.
 - **C-07**: Kubernetes-only. No Docker Compose production path.
-- **C-08**: Application tier must be stateless (state in DB or Redis only).
-- **C-09**: No SACRO/ACRO Python library. trevor implements its own rule engine.
-- **C-10**: Auth exclusively via Keycloak. No local credential store.
-- **C-11**: RO-Crate assembled only at `RELEASED` state, never as a draft.
+- **C-08**: Stateless app tier — all state in DB or Redis.
+- **C-09**: No SACRO/ACRO library — own rule engine.
+- **C-10**: Auth via Keycloak only. No local credential store.
+- **C-11**: RO-Crate assembled only at `RELEASED` state.
 
 ---
 
-## Domain model essentials
+## Domain model
 
-**Implemented entities**: `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `AuditEvent`, `Review`, `ReleaseRecord`, `Notification` (all UUID PKs).
+**Entities** (all UUID PKs): `User`, `Project`, `ProjectMembership`, `AirlockRequest`, `OutputObject`, `OutputObjectMetadata`, `AuditEvent`, `Review`, `ReleaseRecord`, `DeliveryRecord`, `Notification`
 
 **`AirlockRequest` states**:
 `DRAFT → SUBMITTED → AGENT_REVIEW → HUMAN_REVIEW → CHANGES_REQUESTED / APPROVED → RELEASING → RELEASED` (or `REJECTED`)
@@ -197,132 +144,115 @@ spec -> docs/spec          # symlink for backward compatibility
 
 **`ProjectMembership` roles**: `researcher`, `output_checker`, `senior_checker`
 
-**Agent identity**: `agent:trevor-agent` (used as actor in `AuditEvent`)
+**S3 key**: `{project_id}/{request_id}/{object_id}/{version}/{uuid4}-{filename}`
 
-**S3 key format**: `{project_id}/{request_id}/{logical_object_id}/{version}/{uuid4}-{filename}`
+**Agent actor**: `agent:trevor-agent` in `AuditEvent`
 
-**Keycloak global admin role** (`tre_admin`) is read from JWT `realm_access.roles` on every request — not cached locally.
+**Notification event types**: `request.submitted`, `agent_review.ready`, `request.changes_requested`, `request.approved`, `request.rejected`, `request.released`, `presigned_url.expiring_soon`, `request.stuck`
 
 ---
 
 ## Environment variables
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./local/trevor.db` locally; `postgresql+asyncpg://...` in prod |
-| `DEV_AUTH_BYPASS` | Skip Keycloak JWT validation — for tests and local dev |
-| `REDIS_URL` | ARQ queue; e.g. `redis://trevor-redis:6379/0` |
-| `KEYCLOAK_URL` | Keycloak base URL |
-| `KEYCLOAK_REALM` | Realm name (default: `karectl`) |
-| `KEYCLOAK_CLIENT_ID` | OIDC client ID (default: `trevor`) |
-| `S3_ENDPOINT_URL` | MinIO URL for local dev; empty for AWS |
-| `S3_ACCESS_KEY_ID` | S3 credentials |
-| `S3_SECRET_ACCESS_KEY` | S3 credentials |
-| `S3_QUARANTINE_BUCKET` | Upload quarantine bucket (default: `trevor-quarantine`) |
-| `S3_RELEASE_BUCKET` | Release bucket (default: `trevor-release`) |
-
-S3 credentials and Keycloak client secrets are injected via Kubernetes Secrets in prod.
-
-Agent settings:
-
-| Variable | Purpose |
-|---|---|
-| `AGENT_OPENAI_BASE_URL` | OpenAI-compatible LLM endpoint |
-| `AGENT_MODEL_NAME` | Model to use for agent (default: configurable) |
-| `AGENT_API_KEY` | API key for LLM backend |
-| `AGENT_LLM_ENABLED` | Enable/disable agent LLM calls (default: `false`) |
-| `NOTIFICATIONS_ENABLED` | Enable in-app notification dispatch (default: `true`) |
-| `CRD_NAMESPACE` | Kubernetes namespace to watch for CRDs (default: `trevor-dev`) |
-| `CRD_SYNC_ENABLED` | Enable periodic CRD sync cron job (default: `false`; `true` in Tiltfile) |
+| Variable | Default | Notes |
+|---|---|---|
+| `DATABASE_URL` | `sqlite+aiosqlite:///./local/trevor.db` | `postgresql+asyncpg://...` in prod |
+| `DEV_AUTH_BYPASS` | `false` | Skip JWT — set `true` for tests/local |
+| `REDIS_URL` | `redis://localhost:6379/0` | ARQ queue |
+| `SECRET_KEY` | — | CSRF + session signing; required in prod |
+| `KEYCLOAK_URL` | — | Browser-facing; JWT issuer base |
+| `KEYCLOAK_INTERNAL_URL` | — | In-cluster URL for server-side OIDC calls |
+| `KEYCLOAK_REALM` | `karectl` | |
+| `KEYCLOAK_CLIENT_ID` | `trevor` | |
+| `S3_ENDPOINT_URL` | — | Empty = AWS; set for SeaweedFS/MinIO |
+| `S3_ACCESS_KEY_ID` | — | |
+| `S3_SECRET_ACCESS_KEY` | — | |
+| `S3_QUARANTINE_BUCKET` | `trevor-quarantine` | |
+| `S3_RELEASE_BUCKET` | `trevor-release` | |
+| `AGENT_OPENAI_BASE_URL` | — | OpenAI-compatible LLM endpoint |
+| `AGENT_MODEL_NAME` | — | |
+| `AGENT_API_KEY` | — | |
+| `AGENT_LLM_ENABLED` | `false` | |
+| `NOTIFICATIONS_ENABLED` | `true` | Disable to skip ARQ dispatch |
+| `CRD_NAMESPACE` | `trevor-dev` | |
+| `CRD_SYNC_ENABLED` | `false` | `true` in Tiltfile |
+| `STUCK_REQUEST_HOURS` | `72` | SLA threshold for stuck detection |
+| `PRESIGNED_URL_TTL` | `604800` | Release URL TTL in seconds (7 days) |
 
 ---
 
 ## API endpoints
 
-| Method | Path | Auth | Description |
+**JSON API**
+
+| Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/health` | None | Liveness/readiness probe |
-| `GET` | `/users/me` | Any | Current user + memberships + realm roles |
-| `GET` | `/projects` | Any | List all projects |
-| `GET` | `/projects/{id}` | Any | Get project by ID |
-| `GET` | `/memberships/project/{id}` | Any | List memberships for project |
-| `POST` | `/memberships` | `tre_admin` | Create membership (role conflict validated) |
-| `DELETE` | `/memberships/{id}` | `tre_admin` | Remove membership |
-| `POST` | `/requests` | Researcher | Create airlock request |
-| `GET` | `/requests` | Any | List requests (filtered by membership) |
-| `GET` | `/requests/{id}` | Member/Admin | Get request with objects |
-| `POST` | `/requests/{id}/submit` | Owner/Admin | Submit request → enqueue agent review |
-| `POST` | `/requests/{id}/objects` | Researcher | Upload output object |
-| `GET` | `/requests/{id}/objects` | Member/Admin | List objects |
-| `GET` | `/requests/{id}/objects/{oid}` | Member/Admin | Get object |
-| `PATCH` | `/requests/{id}/objects/{oid}/metadata` | Researcher | Update metadata |
-| `GET` | `/requests/{id}/objects/{oid}/metadata` | Member/Admin | Get metadata |
-| `GET` | `/requests/{id}/audit` | Member/Admin | List audit events |
-| `GET` | `/requests/{id}/reviews` | Member/Admin | List reviews |
-| `GET` | `/requests/{id}/reviews/{rid}` | Member/Admin | Get single review |
-| `POST` | `/requests/{id}/reviews` | Checker/Admin | Submit human review |
-| `POST` | `/requests/{id}/objects/{oid}/replace` | Researcher | Upload replacement object |
-| `POST` | `/requests/{id}/resubmit` | Owner/Admin | Resubmit after changes |
-| `GET` | `/requests/{id}/objects/{oid}/versions` | Member/Admin | List object version history |
-| `POST` | `/requests/{id}/release` | `tre_admin` | Trigger release (RO-Crate assembly, egress) |
-| `GET` | `/requests/{id}/release` | Member/Admin | Get release record |
-| `POST` | `/requests/{id}/objects/{oid}/upload-url` | Admin/Senior | Generate pre-signed PUT URL (ingress) |
-| `POST` | `/requests/{id}/objects/{oid}/confirm-upload` | Admin/Senior | Confirm ingress upload, compute checksum |
-| `POST` | `/requests/{id}/deliver` | `tre_admin` | Deliver approved ingress to workspace |
-| `GET` | `/requests/{id}/delivery` | Member/Admin | Get ingress delivery record |
-| `GET` | `/admin/requests` | Admin/Senior | All-projects request overview |
-| `GET` | `/admin/metrics` | Admin/Senior | Pipeline metrics + stuck detection |
-| `GET` | `/admin/audit` | `tre_admin` | Filterable audit log |
-| `GET` | `/admin/audit/export` | `tre_admin` | Export audit log as CSV |
-| `GET` | `/notifications/unread-count` | Any | Unread notification count (JSON or SSE signals) |
-| `GET` | `/notifications` | Any | List notifications for current user |
-| `PATCH` | `/notifications/{id}/read` | Any | Mark notification as read |
-| `POST` | `/notifications/mark-all-read` | Any | Mark all notifications as read |
-| `GET` | `/ui/requests` | Any | Researcher request list (HTML) |
-| `GET` | `/ui/requests/new` | Any | Create request form (HTML) |
-| `POST` | `/ui/requests` | Researcher | Create request via form |
-| `GET` | `/ui/requests/{id}` | Member/Admin | Request detail (HTML) |
-| `GET/POST` | `/ui/requests/{id}/upload` | Researcher | Upload object form + handler |
-| `GET/POST` | `/ui/requests/{id}/objects/{oid}/metadata` | Researcher | Metadata form + handler |
-| `GET/POST` | `/ui/requests/{id}/objects/{oid}/replace` | Researcher | Replace form + handler |
-| `POST` | `/ui/requests/{id}/submit` | Owner/Admin | Submit via UI |
-| `POST` | `/ui/requests/{id}/resubmit` | Owner/Admin | Resubmit via UI |
-| `POST` | `/ui/requests/{id}/release` | `tre_admin` | Release via UI |
-| `GET` | `/ui/ingress/new` | Admin/Senior | Ingress request creation form (HTML) |
-| `POST` | `/ui/requests/ingress` | Admin/Senior | Create ingress request via form |
-| `GET/POST` | `/ui/requests/{id}/ingress-upload` | Admin/Senior | Manage ingress object slots |
-| `POST` | `/ui/requests/{id}/objects/{oid}/generate-url` | Admin/Senior | Generate upload URL via UI |
-| `POST` | `/ui/requests/{id}/objects/{oid}/confirm` | Admin/Senior | Confirm upload via UI |
-| `POST` | `/ui/requests/{id}/deliver` | `tre_admin` | Deliver ingress request via UI |
-| `GET` | `/ui/review` | Checker/Admin | Review queue (HTML) |
-| `GET/POST` | `/ui/review/{id}` | Checker/Admin | Review form + submit |
-| `GET` | `/ui/admin` | `tre_admin` | Admin request overview (HTML) |
-| `GET` | `/ui/admin/metrics` | `tre_admin` | Metrics dashboard (HTML) |
-| `GET` | `/ui/admin/audit` | `tre_admin` | Audit log (HTML) |
-| `GET` | `/ui/admin/memberships/{pid}` | `tre_admin` | Membership management (HTML) |
-| `POST` | `/ui/admin/memberships` | `tre_admin` | Create membership via UI |
-| `POST` | `/ui/admin/memberships/{mid}/delete` | `tre_admin` | Delete membership via UI |
-| `GET` | `/ui/notifications` | Any | Notification inbox (HTML) |
-| `POST` | `/ui/notifications/{id}/read` | Any | Mark notification read (form POST) |
-| `POST` | `/ui/notifications/mark-all-read` | Any | Mark all read (form POST) |
+| `GET` | `/health` | None | |
+| `GET` | `/users/me` | Any | Returns memberships + realm roles |
+| `GET` | `/projects` | Any | |
+| `GET/POST/DELETE` | `/memberships/...` | Admin | Role conflict enforced on POST |
+| `POST` | `/requests` | Researcher | |
+| `GET` | `/requests` | Any | Filtered by project membership |
+| `GET` | `/requests/{id}` | Member | |
+| `POST` | `/requests/{id}/submit` | Owner | Enqueues agent_review_job + notification |
+| `POST` | `/requests/{id}/resubmit` | Owner | |
+| `POST/GET` | `/requests/{id}/objects` | Researcher/Member | Upload / list |
+| `GET/PATCH` | `/requests/{id}/objects/{oid}/metadata` | Researcher/Member | |
+| `POST` | `/requests/{id}/objects/{oid}/replace` | Researcher | |
+| `GET` | `/requests/{id}/objects/{oid}/versions` | Member | |
+| `GET` | `/requests/{id}/audit` | Member | |
+| `POST/GET` | `/requests/{id}/reviews` | Checker/Member | |
+| `GET` | `/requests/{id}/reviews/{rid}` | Member | |
+| `POST/GET` | `/requests/{id}/release` | Admin/Member | POST triggers RO-Crate + release_job |
+| `POST` | `/requests/{id}/objects/{oid}/upload-url` | Admin/Senior | Ingress pre-signed PUT |
+| `POST` | `/requests/{id}/objects/{oid}/confirm-upload` | Admin/Senior | Ingress checksum confirm |
+| `POST/GET` | `/requests/{id}/deliver` | Admin/Member | Ingress delivery |
+| `GET` | `/admin/requests` | Admin/Senior | |
+| `GET` | `/admin/metrics` | Admin/Senior | |
+| `GET` | `/admin/audit` | Admin | |
+| `GET` | `/admin/audit/export` | Admin | CSV |
+| `GET` | `/notifications/unread-count` | Any | JSON or SSE signals (Datastar) |
+| `GET` | `/notifications` | Any | `?limit`, `?before`, `?unread_only` |
+| `PATCH` | `/notifications/{id}/read` | Any | |
+| `POST` | `/notifications/mark-all-read` | Any | |
+
+**UI (HTML — all under `/ui/`)**
+
+Researcher: `/requests`, `/requests/new`, `/requests/{id}`, `/requests/{id}/upload`, `…/objects/{oid}/metadata`, `…/replace`, `/requests/{id}/submit`, `/requests/{id}/resubmit`
+
+Checker: `/review`, `/review/{id}`
+
+Admin: `/admin`, `/admin/metrics`, `/admin/audit`, `/admin/memberships/{pid}`, `/ingress/new`, `/requests/ingress`, `/requests/{id}/ingress-upload`, `…/objects/{oid}/generate-url`, `…/confirm`, `/requests/{id}/deliver`, `/requests/{id}/release`
+
+All roles: `/notifications`, `/notifications/{id}/read`, `/notifications/mark-all-read`
 
 ---
 
 ## Local dev
 
-Full local dev stack requires: **Tilt + k3d/kind**, **SeaweedFS** (local S3), **Keycloak** dev container, **Redis**. Unit tests avoid all of these with `DEV_AUTH_BYPASS=true` and in-memory SQLite.
+Requires Tilt + k3d, SeaweedFS, Keycloak, Redis. Tests need nothing external.
 
 ```bash
-uv sync && uv run pytest -v    # quick check — no external deps needed
+uv sync && uv run pytest -v    # no external deps
+tilt up                        # full stack + migrations + seed
 ```
 
-`tilt up` seeds the **Interstellar** project automatically via the `seed-dev-db` local resource. Dev users (`researcher-1`, `checker-1`, `checker-2`, `admin-user`) are created in Keycloak from `deploy/dev/keycloak-realm.yaml` and in postgres by `scripts/seed-dev-db.py`. All passwords: `password`.
+`tilt up` applies CRDs, creates the **Interstellar** project, and seeds dev users via `seed-dev-db`. All user passwords: `password`.
+
+| Username | Role | Project |
+|---|---|---|
+| `researcher-1` | researcher | Interstellar |
+| `checker-1` | output_checker | Interstellar |
+| `checker-2` | output_checker + senior_checker | Interstellar |
+| `admin-user` | tre_admin (global) | — |
+
+Keycloak admin: `admin` / `admin` at `http://localhost:8080`.
 
 ---
 
 ## Git workflow
 
-- Commit after each discrete piece of work (new model, new router, bug fix, config change). Do not batch unrelated changes.
-- Terse commit messages. Conventional Commits format. Subject ≤50 chars, body only when "why" isn't obvious from the diff.
-- Run `uv run ruff check . && uv run ruff format --check . && uv run pytest -v` before every commit.
+- Commit after each discrete piece of work. Do not batch unrelated changes.
+- Conventional Commits. Subject ≤50 chars; body only when "why" isn't obvious.
+- Run before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest -v`
 - Do not push unless explicitly asked.
