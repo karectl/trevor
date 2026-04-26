@@ -6,6 +6,7 @@
   <p>Create an import request. External submitters will upload files via pre-signed URLs.</p>
 </div>
 <form method="post" action="/ui/requests/ingress">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <div class="form-group">
     <label for="project_id">Project</label>
     <select name="project_id" id="project_id" required>

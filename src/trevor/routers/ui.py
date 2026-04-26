@@ -13,6 +13,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from trevor.auth import AuthContext, CurrentAuth, RequireAdmin
+from trevor.csrf import generate_csrf_token
 from trevor.database import get_session
 from trevor.models.project import Project, ProjectMembership, ProjectRole
 from trevor.models.request import (
@@ -44,11 +45,13 @@ def _base_ctx(request: Request, auth: AuthContext) -> dict:
     is_checker = (
         any(r in ("output_checker", "senior_checker") for r in auth.realm_roles) or is_admin
     )
+    settings: Settings = request.app.state.settings
     return {
         "request": request,
         "user": auth.user,
         "is_admin": is_admin,
         "is_checker": is_checker,
+        "csrf_token": generate_csrf_token(settings.secret_key),
     }
 
 

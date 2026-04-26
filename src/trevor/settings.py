@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     app_title: str = "trevor"
     app_version: str = "0.1.0"
     log_level: str = "INFO"
+    log_format: str = "json"  # "json" or "console"
+    secret_key: str = "dev-secret-key-change-in-prod"  # noqa: S105
+    max_upload_size_mb: int = 500
+
+    # OpenTelemetry
+    otel_enabled: bool = False
+    otel_exporter_endpoint: str = "http://otel-collector:4317"
+    otel_service_name: str = "trevor"
 
 
 def get_settings() -> Settings:

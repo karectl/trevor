@@ -8,6 +8,7 @@
 
 <div class="card">
   <form method="post" action="/ui/requests">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-row">
       <div class="form-group">
         <label for="project_id">Project</label>

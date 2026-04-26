@@ -22,14 +22,17 @@
   {% if airlock_request.status.value == "DRAFT" %}
   <a href="/ui/requests/{{ airlock_request.id }}/upload" class="btn">Upload Object</a>
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/submit" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Submit for Review</button>
   </form>
   {% elif airlock_request.status.value == "CHANGES_REQUESTED" %}
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/resubmit" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Resubmit</button>
   </form>
   {% elif airlock_request.status.value == "APPROVED" and is_admin %}
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/release" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Release</button>
   </form>
   {% endif %}

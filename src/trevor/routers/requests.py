@@ -6,12 +6,13 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from trevor.auth import CurrentAuth
 from trevor.database import get_session
+from trevor.limiter import limiter
 from trevor.models.project import Project, ProjectMembership, ProjectRole, ProjectStatus
 from trevor.models.request import (
     AirlockDirection,
@@ -170,8 +171,10 @@ async def get_request(
 
 
 @router.post("/{request_id}/submit", response_model=RequestRead)
+@limiter.limit("10/minute")
 async def submit_request(
     request_id: uuid.UUID,
+    request: Request,
     auth: CurrentAuth,
     session: Session,
     settings: SettingsDep,
@@ -201,6 +204,10 @@ async def submit_request(
     )
     await session.commit()
     await session.refresh(req)
+
+    from trevor.metrics import requests_submitted_total
+
+    requests_submitted_total.labels(direction=req.direction).inc()
 
     # Enqueue agent review (inline in dev mode, ARQ in prod)
     if settings.dev_auth_bypass:
@@ -256,6 +263,12 @@ async def upload_object(
 
     if file is not None:
         raw = await file.read()
+        max_bytes = settings.max_upload_size_mb * 1024 * 1024
+        if len(raw) > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum upload size of {settings.max_upload_size_mb} MB",
+            )
         checksum = hashlib.sha256(raw).hexdigest()
         size = len(raw)
         if not settings.dev_auth_bypass:
@@ -305,6 +318,10 @@ async def upload_object(
     )
     await session.commit()
     await session.refresh(obj)
+
+    from trevor.metrics import objects_uploaded_total
+
+    objects_uploaded_total.labels(direction=req.direction).inc()
     return obj
 
 
@@ -452,6 +469,12 @@ async def replace_object(
         )
 
     raw = await file.read()
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    if len(raw) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum upload size of {settings.max_upload_size_mb} MB",
+        )
     checksum = hashlib.sha256(raw).hexdigest()
     size = len(raw)
 
@@ -518,8 +541,10 @@ async def replace_object(
 
 
 @router.post("/{request_id}/resubmit", response_model=RequestRead)
+@limiter.limit("10/minute")
 async def resubmit_request(
     request_id: uuid.UUID,
+    request: Request,
     auth: CurrentAuth,
     session: Session,
     settings: SettingsDep,

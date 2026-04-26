@@ -22,6 +22,14 @@ dependencies = [
     "pydantic-ai>=0.2.0",
     "sse-starlette>=3.3.4",
     "datastar-py>=1.0.0",
+    "structlog>=25.5.0",
+    "prometheus-fastapi-instrumentator>=7.1.0",
+    "itsdangerous>=2.2.0",
+    "slowapi>=0.1.9",
+    "opentelemetry-sdk>=1.25.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.25.0",
+    "opentelemetry-instrumentation-fastapi>=0.46b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.46b0",
 ]
 
 [project.scripts]

@@ -44,10 +44,12 @@
         <td class="actions">
           {% if airlock_request.status == 'DRAFT' %}
           <form method="post" action="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/generate-url" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="btn btn-sm">Generate URL</button>
           </form>
           {% if obj.upload_url_generated_at and not obj.checksum_sha256 %}
           <form method="post" action="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/confirm" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="btn btn-sm btn-primary">Confirm Upload</button>
           </form>
           {% endif %}
@@ -66,6 +68,7 @@
 <section>
   <h2>Add Object Slot</h2>
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/ingress-upload">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-group">
       <label for="filename">Expected Filename</label>
       <input type="text" name="filename" id="filename" required placeholder="e.g. patient_data.csv">
@@ -86,6 +89,7 @@
 
 <section class="form-actions">
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/submit">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Submit for Review</button>
   </form>
 </section>
@@ -94,6 +98,7 @@
 {% if airlock_request.status == 'APPROVED' %}
 <section class="form-actions">
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/deliver">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Deliver to Workspace</button>
   </form>
 </section>

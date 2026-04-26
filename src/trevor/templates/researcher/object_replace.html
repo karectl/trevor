@@ -8,6 +8,7 @@
 
 <div class="card">
   <form method="post" action="/ui/requests/{{ request_id }}/objects/{{ object.id }}/replace" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-group">
       <label for="file">Replacement File</label>
       <input type="file" name="file" id="file" required>

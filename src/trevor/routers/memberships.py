@@ -3,11 +3,12 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from trevor.auth import CurrentAuth, require_admin
 from trevor.database import get_session
+from trevor.limiter import limiter
 from trevor.schemas.membership import MembershipCreate, MembershipRead
 from trevor.services.membership_service import (
     create_membership,
@@ -29,7 +30,9 @@ async def list_project_memberships(
 
 
 @router.post("", response_model=MembershipRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 async def create_project_membership(
+    request: Request,
     body: MembershipCreate,
     auth: Annotated[CurrentAuth, Depends(require_admin)],
     session: Annotated[AsyncSession, Depends(get_session)],

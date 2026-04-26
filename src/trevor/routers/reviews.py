@@ -247,6 +247,15 @@ async def create_human_review(
 
     await session.commit()
     await session.refresh(review)
+    await session.refresh(req)
+
+    from trevor.metrics import requests_approved_total, requests_rejected_total
+
+    if req.status == AirlockRequestStatus.APPROVED:
+        requests_approved_total.labels(direction=req.direction).inc()
+    elif req.status == AirlockRequestStatus.REJECTED:
+        requests_rejected_total.labels(direction=req.direction).inc()
+
     return review
 
 

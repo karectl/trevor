@@ -36,6 +36,7 @@
 <h2 class="mt-2 mb-1" style="font-size:1rem;">Submit Review</h2>
 <div class="card">
   <form method="post" action="/ui/review/{{ airlock_request.id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-group">
       <label>Overall Decision</label>
       <div class="flex gap-1">
