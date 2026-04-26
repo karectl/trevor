@@ -10,6 +10,14 @@
 <body>
 <div class="rv-shell" data-signals="{selected: 0}">
 
+  {# Hidden per-object decision inputs — always present so button clicks can write to them.
+     form="review-form" associates them with the submit form when it is rendered. #}
+  {% for obj in objects %}
+  {% if obj.state.value == "PENDING" %}
+  <input type="hidden" id="obj_{{ obj.id }}_decision" name="obj_{{ obj.id }}_decision" value="" form="review-form">
+  {% endif %}
+  {% endfor %}
+
   {# ---- Header bar ---- #}
   <header class="rv-header">
     <div class="rv-header-left">
@@ -250,11 +258,6 @@
     {% else %}
     <form id="review-form" method="post" action="/ui/review/{{ airlock_request.id }}" class="rv-footer-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      {% for obj in objects %}
-      {% if obj.state.value == "PENDING" %}
-      <input type="hidden" id="obj_{{ obj.id }}_decision" name="obj_{{ obj.id }}_decision" value="">
-      {% endif %}
-      {% endfor %}
 
       <div class="rv-footer-left">
         <label class="rv-footer-label">Overall decision:</label>
