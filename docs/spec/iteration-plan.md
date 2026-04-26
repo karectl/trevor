@@ -221,6 +221,26 @@ Deliverables:
 
 ---
 
+## Iteration 12 — OIDC login/logout flow & JWT validation
+
+**Goal**: Full browser login/logout UX via Keycloak OIDC and JWT validation for API Bearer tokens.
+
+Spec: `spec/iterations/iteration-12-spec.md`  
+ADR: ADR-0007 (existing — covers all auth decisions)
+
+Deliverables:
+- OIDC client module: discovery, PKCE, token exchange, JWKS cache, ID token validation
+- Session cookie module: stateless signed cookie via `itsdangerous`
+- Auth routes: `/auth/login` (redirect to Keycloak), `/auth/callback` (code exchange), `/auth/logout`
+- Dual auth in `get_auth_context`: session cookie for UI, Bearer token for API, dev bypass unchanged
+- JWT validation against Keycloak JWKS (`python-jose`)
+- 401 handler: redirect to login for browser requests, JSON for API
+- Logout link in nav template
+- Keycloak realm config: `standardFlowEnabled: true`
+- Tests: PKCE, session cookie roundtrip, JWT validation, login/callback/logout flow (mocked Keycloak)
+
+---
+
 ## Later / backlog
 
 - Per-user notification preference settings
