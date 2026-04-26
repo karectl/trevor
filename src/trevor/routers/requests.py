@@ -115,7 +115,7 @@ async def create_request(
         title=body.title,
         description=body.description,
         submitted_by=auth.user.id,
-        updated_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(req)
     await audit_service.emit(
@@ -193,8 +193,8 @@ async def submit_request(
     if not objects_result.first():
         raise HTTPException(status_code=422, detail="Request has no pending objects")
     req.status = AirlockRequestStatus.SUBMITTED
-    req.submitted_at = datetime.now(UTC)
-    req.updated_at = datetime.now(UTC)
+    req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
+    req.updated_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(req)
     await audit_service.emit(
         session,
@@ -379,7 +379,7 @@ async def update_metadata(
     meta.researcher_justification = body.researcher_justification
     meta.suppression_notes = body.suppression_notes
     meta.tags = body.tags
-    meta.updated_at = datetime.now(UTC)
+    meta.updated_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(meta)
     await audit_service.emit(
         session,
@@ -573,8 +573,8 @@ async def resubmit_request(
         )
 
     req.status = AirlockRequestStatus.SUBMITTED
-    req.submitted_at = datetime.now(UTC)
-    req.updated_at = datetime.now(UTC)
+    req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
+    req.updated_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(req)
     await audit_service.emit(
         session,

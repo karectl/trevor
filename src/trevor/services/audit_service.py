@@ -22,7 +22,7 @@ async def emit(
         actor_id=actor_id,
         event_type=event_type,
         payload=payload or {},
-        timestamp=datetime.now(UTC),
+        timestamp=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(event)
     return event

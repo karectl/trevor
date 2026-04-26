@@ -87,12 +87,12 @@ async def _evaluate_two_reviewer_rule(req: AirlockRequest, session: AsyncSession
         return  # Shouldn't happen, but safety
 
     req.status = new_status
-    req.updated_at = datetime.now(UTC)
+    req.updated_at = datetime.now(UTC).replace(tzinfo=None)
     if new_status in (
         AirlockRequestStatus.APPROVED,
         AirlockRequestStatus.REJECTED,
     ):
-        req.closed_at = datetime.now(UTC)
+        req.closed_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(req)
     await audit_service.emit(
         session,
@@ -227,7 +227,7 @@ async def create_human_review(
                 }
                 # Must create new list to trigger change detection
                 meta.checker_feedback = [*meta.checker_feedback, feedback_entry]
-                meta.updated_at = datetime.now(UTC)
+                meta.updated_at = datetime.now(UTC).replace(tzinfo=None)
                 session.add(meta)
 
     await audit_service.emit(

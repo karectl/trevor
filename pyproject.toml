@@ -49,6 +49,7 @@ dev = [
     "httpx>=0.28.1",
     "anyio>=4.13.0",
     "zensical>=0.0.36",
+    "playwright>=1.58.0",
 ]
 
 [tool.ruff]

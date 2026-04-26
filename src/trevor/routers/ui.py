@@ -104,7 +104,8 @@ async def request_list(
     result = await session.exec(query)
     reqs = list(result.all())
 
-    # Attach object counts
+    # Attach object counts as plain dicts to avoid SQLModel field validation
+    req_rows = []
     for req in reqs:
         obj_result = await session.exec(
             select(OutputObject).where(
@@ -112,11 +113,11 @@ async def request_list(
                 OutputObject.state != OutputObjectState.SUPERSEDED,
             )
         )
-        req.object_count = len(list(obj_result.all()))  # type: ignore[attr-defined]
+        req_rows.append({"req": req, "object_count": len(list(obj_result.all()))})
 
     ctx = _base_ctx(request, auth)
     ctx.update(
-        requests=reqs,
+        requests=req_rows,
         projects=projects,
         statuses=[s.value for s in AirlockRequestStatus],
         status_filter=status or "",
@@ -438,8 +439,8 @@ async def request_submit(
     if not req or req.status != AirlockRequestStatus.DRAFT:
         raise HTTPException(status_code=409)
     req.status = AirlockRequestStatus.SUBMITTED
-    req.submitted_at = datetime.now(UTC)
-    req.updated_at = datetime.now(UTC)
+    req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
+    req.updated_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(req)
     await audit_service.emit(
         session,
@@ -465,8 +466,8 @@ async def request_resubmit(
     if not req or req.status != AirlockRequestStatus.CHANGES_REQUESTED:
         raise HTTPException(status_code=409)
     req.status = AirlockRequestStatus.SUBMITTED
-    req.submitted_at = datetime.now(UTC)
-    req.updated_at = datetime.now(UTC)
+    req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
+    req.updated_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(req)
     await audit_service.emit(
         session,
@@ -843,10 +844,12 @@ async def admin_memberships(
     users = list(user_result.all())
 
     ctx = _base_ctx(request, auth)
+    user_map = {str(u.id): u.username for u in users}
     ctx.update(
         project=project,
         memberships=memberships,
         users=users,
+        user_map=user_map,
         error_message=None,
     )
     return templates.TemplateResponse("admin/membership_manage.html", ctx)

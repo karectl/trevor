@@ -44,12 +44,12 @@
     </tr>
   </thead>
   <tbody>
-    {% for req in requests %}
+    {% for row in requests %}
     <tr>
-      <td><a href="/ui/requests/{{ req.id }}">{{ req.title }}</a></td>
-      <td><span class="badge badge-{{ req.status }}">{{ req.status|replace("_", " ") }}</span></td>
-      <td>{{ req.object_count|default(0) }}</td>
-      <td class="text-muted text-sm">{{ req.updated_at.strftime('%Y-%m-%d %H:%M') if req.updated_at else '-' }}</td>
+      <td><a href="/ui/requests/{{ row.req.id }}">{{ row.req.title }}</a></td>
+      <td><span class="badge badge-{{ row.req.status }}">{{ row.req.status|replace("_", " ") }}</span></td>
+      <td>{{ row.object_count }}</td>
+      <td class="text-muted text-sm">{{ row.req.updated_at.strftime('%Y-%m-%d %H:%M') if row.req.updated_at else '-' }}</td>
     </tr>
     {% endfor %}
   </tbody>

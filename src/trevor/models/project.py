@@ -8,7 +8,7 @@ from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class ProjectStatus(enum.StrEnum):

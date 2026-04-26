@@ -210,7 +210,9 @@ async def assemble_and_release(
 
     storage_key = f"releases/{request_id}/ro-crate-{request_id}.zip"
     presigned_url = ""
-    url_expires_at = datetime.now(UTC) + timedelta(seconds=settings.presigned_url_ttl)
+    url_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(
+        seconds=settings.presigned_url_ttl
+    )
 
     if not settings.dev_auth_bypass:
         from trevor.storage import generate_presigned_get_url, upload_object
@@ -244,8 +246,8 @@ async def assemble_and_release(
 
     # Transition to RELEASED
     req.status = AirlockRequestStatus.RELEASED
-    req.updated_at = datetime.now(UTC)
-    req.closed_at = datetime.now(UTC)
+    req.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    req.closed_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(req)
 
     await audit_service.emit(
