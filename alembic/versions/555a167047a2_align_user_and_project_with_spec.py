@@ -64,7 +64,7 @@ def upgrade() -> None:
             "crd_synced_at",
             sa.DateTime(),
             nullable=False,
-            server_default=sa.text("(datetime('now'))"),
+            server_default=sa.text("now()"),
         ),
     )
 
