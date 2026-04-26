@@ -1,0 +1,13 @@
+Hi {{ recipient_name }},
+
+A new airlock request has been submitted and is awaiting review.
+
+Request: {{ request_title }}
+Project: {{ project_name }}
+Submitted by: {{ submitter_name }}
+
+The request is currently undergoing automated agent review. You will be notified when human review can begin.
+
+View the review queue: {{ trevor_base_url }}/ui/review
+
+— trevor

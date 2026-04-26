@@ -1,0 +1,14 @@
+Hi {{ recipient_name }},
+
+Your download link for the following request is expiring soon.
+
+Request: {{ request_title }}
+Project: {{ project_name }}
+Time remaining: {{ hours_remaining }} hours
+
+Download link:
+{{ presigned_url }}
+
+Please download your outputs before the link expires. Contact your administrator if you need a new link.
+
+— trevor

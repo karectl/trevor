@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Request rejected</title></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  <p>Hi {{ recipient_name }},</p>
+  <p>Your airlock request has been rejected.</p>
+  <table style="border-collapse:collapse;width:100%;margin:16px 0">
+    <tr><td style="padding:4px 8px;font-weight:bold;width:140px">Request</td><td style="padding:4px 8px">{{ request_title }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Project</td><td style="padding:4px 8px">{{ project_name }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Rejected by</td><td style="padding:4px 8px">{{ reviewer_name }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Reason</td><td style="padding:4px 8px">{{ rejection_reason }}</td></tr>
+  </table>
+  <p>If you have questions, please contact your project's output checker.</p>
+  <p><a href="{{ trevor_base_url }}/ui/requests/{{ request_id }}">View request</a></p>
+  <hr style="margin:32px 0;border:none;border-top:1px solid #ddd">
+  <p style="color:#888;font-size:12px">trevor — KARECTL airlock manager</p>
+</body>
+</html>

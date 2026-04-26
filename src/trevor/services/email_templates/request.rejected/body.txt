@@ -1,0 +1,14 @@
+Hi {{ recipient_name }},
+
+Your airlock request has been rejected.
+
+Request: {{ request_title }}
+Project: {{ project_name }}
+Rejected by: {{ reviewer_name }}
+Reason: {{ rejection_reason }}
+
+If you have questions, please contact your project's output checker.
+
+View request: {{ trevor_base_url }}/ui/requests/{{ request_id }}
+
+— trevor

@@ -1,0 +1,13 @@
+Hi {{ recipient_name }},
+
+Your airlock request has been approved by the required reviewers.
+
+Request: {{ request_title }}
+Project: {{ project_name }}
+Approved by: {{ reviewer_name }} ({{ approver_count }} approver(s) total)
+
+Your outputs will be released shortly. You will receive another notification when they are available for download.
+
+View request: {{ trevor_base_url }}/ui/requests/{{ request_id }}
+
+— trevor

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Agent review complete</title></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  <p>Hi {{ recipient_name }},</p>
+  <p>Automated agent review is complete. Human review can now begin.</p>
+  <table style="border-collapse:collapse;width:100%;margin:16px 0">
+    <tr><td style="padding:4px 8px;font-weight:bold;width:160px">Request</td><td style="padding:4px 8px">{{ request_title }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Project</td><td style="padding:4px 8px">{{ project_name }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Objects reviewed</td><td style="padding:4px 8px">{{ object_count }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Risk summary</td><td style="padding:4px 8px">{{ risk_summary }}</td></tr>
+  </table>
+  <p><a href="{{ trevor_base_url }}/ui/review/{{ request_id }}">Review this request</a></p>
+  <hr style="margin:32px 0;border:none;border-top:1px solid #ddd">
+  <p style="color:#888;font-size:12px">trevor — KARECTL airlock manager</p>
+</body>
+</html>

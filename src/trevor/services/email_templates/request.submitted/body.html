@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Request submitted</title></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  <p>Hi {{ recipient_name }},</p>
+  <p>A new airlock request has been submitted and is awaiting review.</p>
+  <table style="border-collapse:collapse;width:100%;margin:16px 0">
+    <tr><td style="padding:4px 8px;font-weight:bold;width:140px">Request</td><td style="padding:4px 8px">{{ request_title }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Project</td><td style="padding:4px 8px">{{ project_name }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Submitted by</td><td style="padding:4px 8px">{{ submitter_name }}</td></tr>
+  </table>
+  <p>The request is currently undergoing automated agent review. You will be notified when human review can begin.</p>
+  <p><a href="{{ trevor_base_url }}/ui/review">View review queue</a></p>
+  <hr style="margin:32px 0;border:none;border-top:1px solid #ddd">
+  <p style="color:#888;font-size:12px">trevor — KARECTL airlock manager</p>
+</body>
+</html>

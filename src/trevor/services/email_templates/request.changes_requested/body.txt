@@ -1,0 +1,12 @@
+Hi {{ recipient_name }},
+
+A reviewer has requested changes to your airlock request.
+
+Request: {{ request_title }}
+Project: {{ project_name }}
+Reviewer: {{ reviewer_name }}
+Feedback: {{ feedback_summary }}
+
+Please update your outputs and resubmit: {{ trevor_base_url }}/ui/requests/{{ request_id }}
+
+— trevor

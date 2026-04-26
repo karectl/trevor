@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Download link expiring</title></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  <p>Hi {{ recipient_name }},</p>
+  <p><strong>Your download link is expiring in {{ hours_remaining }} hours.</strong></p>
+  <table style="border-collapse:collapse;width:100%;margin:16px 0">
+    <tr><td style="padding:4px 8px;font-weight:bold;width:140px">Request</td><td style="padding:4px 8px">{{ request_title }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Project</td><td style="padding:4px 8px">{{ project_name }}</td></tr>
+    <tr><td style="padding:4px 8px;font-weight:bold">Time remaining</td><td style="padding:4px 8px">{{ hours_remaining }} hours</td></tr>
+  </table>
+  <p style="margin:24px 0">
+    <a href="{{ presigned_url }}" style="background:#dc2626;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;display:inline-block">Download now</a>
+  </p>
+  <p style="color:#666;font-size:13px">Contact your administrator if you need a new link after expiry.</p>
+  <hr style="margin:32px 0;border:none;border-top:1px solid #ddd">
+  <p style="color:#888;font-size:12px">trevor — KARECTL airlock manager</p>
+</body>
+</html>

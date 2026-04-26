@@ -74,6 +74,16 @@ class Settings(BaseSettings):
     # Notifications
     notifications_enabled: bool = True
 
+    # Email / SMTP
+    smtp_host: str = "localhost"
+    smtp_port: int = 587
+    smtp_from_address: str = "trevor@karectl.example"
+    smtp_use_tls: bool = True
+    smtp_username: str = ""
+    smtp_password: str = ""
+    email_notifications_enabled: bool = False
+    trevor_base_url: str = "http://localhost:8000"
+
 
 def get_settings() -> Settings:
     return Settings()

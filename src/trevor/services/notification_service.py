@@ -5,8 +5,12 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass, field
+from email.message import EmailMessage
+from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+import aiosmtplib
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -15,6 +19,8 @@ from trevor.models.notification import Notification, NotificationEventType
 if TYPE_CHECKING:
     from trevor.models.request import AirlockRequest
     from trevor.settings import Settings
+
+_EMAIL_TEMPLATE_DIR = Path(__file__).parent / "email_templates"
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +73,83 @@ class InAppBackend:
             )
             session.add(notification)
         # Caller is responsible for commit
+
+
+# ---------------------------------------------------------------------------
+# SmtpBackend
+# ---------------------------------------------------------------------------
+
+
+class SmtpBackend:
+    """Send email notifications via SMTP.
+
+    Template rendering uses a separate Jinja2 environment pointing at
+    src/trevor/services/email_templates/{event_type}/.
+    Each event directory contains subject.txt, body.html, body.txt.
+
+    All SMTP exceptions are caught and logged — send() never raises (ADR-0009).
+    """
+
+    def __init__(self, settings: Settings) -> None:
+        self.host = settings.smtp_host
+        self.port = settings.smtp_port
+        self.from_address = settings.smtp_from_address
+        self.use_tls = settings.smtp_use_tls
+        self.username = settings.smtp_username or None
+        self.password = settings.smtp_password or None
+        self.base_url = settings.trevor_base_url
+
+        self._jinja_env = Environment(
+            loader=FileSystemLoader(_EMAIL_TEMPLATE_DIR),
+            autoescape=select_autoescape(["html"]),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+
+    async def send(self, event: NotificationEvent, session: AsyncSession) -> None:  # noqa: ARG002
+        """Send email to all recipients resolved from event.metadata['recipient_emails']."""
+        recipients: list[str] = event.metadata.get("recipient_emails", [])
+        if not recipients:
+            return
+
+        try:
+            ctx = {**event.metadata, "event_type": event.event_type}
+            subject = self._render(event.event_type, "subject.txt", ctx).strip()
+            body_html = self._render(event.event_type, "body.html", ctx)
+            body_text = self._render(event.event_type, "body.txt", ctx)
+        except Exception:
+            logger.exception("smtp: template render failed for %s", event.event_type)
+            return
+
+        for recipient in recipients:
+            try:
+                msg = self._build_message(subject, body_html, body_text, recipient)
+                await aiosmtplib.send(
+                    msg,
+                    hostname=self.host,
+                    port=self.port,
+                    start_tls=self.use_tls,
+                    username=self.username,
+                    password=self.password,
+                )
+                logger.info("smtp: sent %s to %s", event.event_type, recipient)
+            except Exception:
+                logger.exception("smtp: failed sending %s to %s", event.event_type, recipient)
+
+    def _render(self, event_type: str, filename: str, ctx: dict) -> str:
+        template = self._jinja_env.get_template(f"{event_type}/{filename}")
+        return template.render(**ctx)
+
+    def _build_message(
+        self, subject: str, body_html: str, body_text: str, recipient: str
+    ) -> EmailMessage:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = self.from_address
+        msg["To"] = recipient
+        msg.set_content(body_text)
+        msg.add_alternative(body_html, subtype="html")
+        return msg
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +296,9 @@ def get_router(settings: Settings) -> NotificationRouter:
     """Build a NotificationRouter with enabled backends.
 
     InAppBackend is always registered.
-    Future: SmtpBackend added in iteration 15 when smtp_notifications_enabled=True.
+    SmtpBackend added when email_notifications_enabled=True.
     """
     backends: list[NotificationBackend] = [InAppBackend()]
+    if settings.email_notifications_enabled:
+        backends.append(SmtpBackend(settings))
     return NotificationRouter(backends)

@@ -1,0 +1,14 @@
+Hi {{ recipient_name }},
+
+Your approved outputs are ready for download.
+
+Request: {{ request_title }}
+Project: {{ project_name }}
+Files released: {{ object_count }}
+
+Download link (expires in {{ expiry_hours }} hours):
+{{ presigned_url }}
+
+This link is personal and should not be shared.
+
+— trevor

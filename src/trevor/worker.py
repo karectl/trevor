@@ -197,7 +197,7 @@ async def send_notifications_job(
 ) -> None:
     """Dispatch a notification event for a given request and event type."""
     from trevor.models.request import AirlockRequest
-    from trevor.services.notification_service import create_event, get_router
+    from trevor.services.notification_service import NotificationRouter, create_event, get_router
 
     settings: Settings = ctx["settings"]
     if not settings.notifications_enabled:
@@ -220,7 +220,7 @@ async def send_notifications_job(
             logger.debug("send_notifications_job: no recipients for %s", event_type)
             return
 
-        router = get_router(settings)
+        router: NotificationRouter = ctx.get("notification_router") or get_router(settings)
         await router.dispatch(event, session)
         await session.commit()
         logger.info(
@@ -269,12 +269,15 @@ async def crd_sync_job(ctx: dict[str, Any]) -> None:
 
 
 async def startup(ctx: dict[str, Any]) -> None:
+    from trevor.services.notification_service import get_router
+
     settings = get_settings()
     engine = create_async_engine(settings.database_url, echo=False, future=True)
     ctx["session_factory"] = async_sessionmaker(
         bind=engine, class_=AsyncSession, expire_on_commit=False
     )
     ctx["settings"] = settings
+    ctx["notification_router"] = get_router(settings)
     logger.info("ARQ worker starting up")
 
 

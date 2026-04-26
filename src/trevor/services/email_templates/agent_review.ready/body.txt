@@ -1,0 +1,12 @@
+Hi {{ recipient_name }},
+
+Automated agent review is complete for the following request. Human review can now begin.
+
+Request: {{ request_title }}
+Project: {{ project_name }}
+Objects reviewed: {{ object_count }}
+Risk summary: {{ risk_summary }}
+
+View the request: {{ trevor_base_url }}/ui/review/{{ request_id }}
+
+— trevor
