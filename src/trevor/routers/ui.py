@@ -929,6 +929,22 @@ async def review_form(
             except Exception:
                 logger.debug("preview unavailable for %s", obj.filename, exc_info=True)
 
+    # Fetch the existing human review (if any) for read-only display
+    human_review_result = await session.exec(
+        select(Review).where(
+            Review.request_id == request_id,
+            Review.reviewer_type == ReviewerType.HUMAN,
+        )
+    )
+    existing_review = human_review_result.first()
+
+    _REVIEWABLE_STATUSES = (
+        AirlockRequestStatus.SUBMITTED,
+        AirlockRequestStatus.AGENT_REVIEW,
+        AirlockRequestStatus.HUMAN_REVIEW,
+    )
+    is_readonly = req.status not in _REVIEWABLE_STATUSES
+
     ctx = _base_ctx(request, auth)
     ctx.update(
         airlock_request=req,
@@ -942,6 +958,8 @@ async def review_form(
             AirlockRequestStatus.SUBMITTED,
             AirlockRequestStatus.AGENT_REVIEW,
         ),
+        existing_review=existing_review,
+        is_readonly=is_readonly,
     )
     return templates.TemplateResponse("checker/review_form.html", ctx)
 

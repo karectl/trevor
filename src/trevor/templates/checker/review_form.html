@@ -288,44 +288,70 @@
 
   {# ---- Bottom bar with submit ---- #}
   <footer class="rv-footer">
-    {% if agent_review_pending %}
-    <div class="rv-footer-pending">
-      Agent review is still in progress — you can submit your review now, but you will be deciding without agent input.
-    </div>
-    {% endif %}
-    <form id="review-form" method="post" action="/ui/review/{{ airlock_request.id }}" class="rv-footer-form"
-          {% if agent_review_pending %}onsubmit="return confirm('Agent review has not completed. Are you sure you want to submit your review without agent input?')"{% endif %}>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-      <div class="rv-footer-left">
-        <label class="rv-footer-label">Overall decision:</label>
-        <div class="rv-footer-derived">
-          <span class="rv-derived-badge rv-derived-undecided"
-                data-show="$overall === ''"
-                >Decide all files first</span>
-          <span class="rv-derived-badge rv-derived-approved"
-                style="display:none"
-                data-show="$overall === 'approved'"
-                >&#10003; Approve all</span>
-          <span class="rv-derived-badge rv-derived-changes"
-                style="display:none"
-                data-show="$overall === 'changes_requested'"
-                >&#9651; Request changes</span>
-          <span class="rv-derived-badge rv-derived-rejected"
-                style="display:none"
-                data-show="$overall === 'rejected'"
-                >&#9632; Reject</span>
+    {% if is_readonly %}
+      {# Request already decided — show recorded review read-only #}
+      {% if existing_review %}
+      <div class="rv-footer-readonly">
+        <div class="rv-footer-left">
+          <span class="rv-footer-label">Decision:</span>
+          {% if existing_review.decision == 'approved' %}
+          <span class="rv-derived-badge rv-derived-approved">&#10003; Approve all</span>
+          {% elif existing_review.decision == 'changes_requested' %}
+          <span class="rv-derived-badge rv-derived-changes">&#9651; Request changes</span>
+          {% elif existing_review.decision == 'rejected' %}
+          <span class="rv-derived-badge rv-derived-rejected">&#9632; Reject</span>
+          {% else %}
+          <span class="rv-derived-badge rv-derived-undecided">{{ existing_review.decision }}</span>
+          {% endif %}
         </div>
+        {% if existing_review.summary %}
+        <div class="rv-footer-center">
+          <span class="rv-summary-readonly text-sm">{{ existing_review.summary }}</span>
+        </div>
+        {% endif %}
       </div>
-      <div class="rv-footer-center">
-        <input type="text" name="summary" placeholder="Overall summary (required)" class="rv-summary-input" required>
+      {% endif %}
+    {% else %}
+      {# Reviewable — show editable form #}
+      {% if agent_review_pending %}
+      <div class="rv-footer-pending">
+        Agent review is still in progress — you can submit your review now, but you will be deciding without agent input.
       </div>
-      <div class="rv-footer-right">
-        <button type="submit" class="btn btn-primary"
-                data-attr:disabled="$overall === '' ? true : undefined"
-                data-class:btn-disabled="$overall === ''">Submit Review</button>
-      </div>
-    </form>
+      {% endif %}
+      <form id="review-form" method="post" action="/ui/review/{{ airlock_request.id }}" class="rv-footer-form"
+            {% if agent_review_pending %}onsubmit="return confirm('Agent review has not completed. Are you sure you want to submit your review without agent input?')"{% endif %}>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="rv-footer-left">
+          <label class="rv-footer-label">Overall decision:</label>
+          <div class="rv-footer-derived">
+            <span class="rv-derived-badge rv-derived-undecided"
+                  data-show="$overall === ''"
+                  >Decide all files first</span>
+            <span class="rv-derived-badge rv-derived-approved"
+                  style="display:none"
+                  data-show="$overall === 'approved'"
+                  >&#10003; Approve all</span>
+            <span class="rv-derived-badge rv-derived-changes"
+                  style="display:none"
+                  data-show="$overall === 'changes_requested'"
+                  >&#9651; Request changes</span>
+            <span class="rv-derived-badge rv-derived-rejected"
+                  style="display:none"
+                  data-show="$overall === 'rejected'"
+                  >&#9632; Reject</span>
+          </div>
+        </div>
+        <div class="rv-footer-center">
+          <input type="text" name="summary" placeholder="Overall summary (required)" class="rv-summary-input" required>
+        </div>
+        <div class="rv-footer-right">
+          <button type="submit" class="btn btn-primary"
+                  data-attr:disabled="$overall === '' ? true : undefined"
+                  data-class:btn-disabled="$overall === ''">Submit Review</button>
+        </div>
+      </form>
+    {% endif %}
   </footer>
 
 </div>{# rv-shell #}
