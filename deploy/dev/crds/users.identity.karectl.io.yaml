@@ -1,0 +1,129 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: users.identity.karectl.io
+spec:
+  group: identity.karectl.io
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              id:
+                type: string
+                description: A globally unique identifier for the user, ensuring unambiguous
+                  reference within and across systems.
+              username:
+                type: string
+                description: The user's unique login or account name, used for authentication
+                  and identification within the project.
+              given_name:
+                type: string
+                description: The user's first or given name, representing their personal
+                  identity.
+              family_name:
+                type: string
+                description: The user's last or family name, used for identification
+                  and display purposes.
+              affiliation:
+                type: string
+                description: The name of the organization or institution with which
+                  the user is affiliated, representing their organizational context.
+              email:
+                type: string
+                description: The user's email address, used for communication and
+                  notifications related to the project.
+              groups:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    value:
+                      type: string
+                      description: The unique identifier of the group, typically used
+                        as the group ID for referencing and access control. Read-only.
+                    ref:
+                      type: string
+                      description: The URI reference to the corresponding Group resource,
+                        enabling linkage to external or internal group definitions.
+                        Read-only.
+                    display:
+                      type: string
+                      description: A human-readable display name for the group, used
+                        for UI and reporting. Read-only.
+                    type:
+                      type: string
+                      description: Type of TRE group membership
+                      enum:
+                      - Manual
+                      - Automatic
+                  additionalProperties: true
+                description: List of groups to which the user belongs within the project,
+                  representing roles, permissions, or organizational units.
+              start_date:
+                type: string
+                description: The date when the user's access to the project becomes
+                  active, representing the start of their membership or role.
+              expiry_date:
+                type: string
+                description: The date when the user's access to the project expires,
+                  representing the end of their membership or role.
+              enabled:
+                type: boolean
+                description: Whether the user account is enabled.
+              password:
+                type: string
+                description: Optional initial password. If not set, the operator generates
+                  a temporary password.
+            required:
+            - username
+            - given_name
+            - family_name
+            - affiliation
+            - email
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                  required:
+                  - type
+                  - status
+                  - reason
+                  - message
+              observedGeneration:
+                type: integer
+            additionalProperties: true
+        required:
+        - spec
+    subresources:
+      status: {}
+  scope: Namespaced
+  names:
+    plural: users
+    singular: user
+    kind: User
+    shortNames:
+    - use

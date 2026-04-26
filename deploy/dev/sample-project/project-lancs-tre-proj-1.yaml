@@ -1,0 +1,50 @@
+apiVersion: research.karectl.io/v1alpha1
+kind: Project
+metadata:
+  name: lancs-tre-proj-1
+  namespace: trevor-dev
+  labels:
+    cr8tor.io/project-id: 355783fb-a6c8-4a39-80aa-4a57c8c90a8a
+    cr8tor.io/created-at: '20260413'
+spec:
+  description: cardiometabolicfactors
+  resources:
+  - resource_type: Jupyter
+    name: jupyterhub
+    url: https://jupyter.lancs-tre-proj-1.example.com
+    enabled: true
+    auth: oidc
+    profiles:
+    - display_name: Lancs Tre Proj 1 Workspace 1
+      description: A TRE workspace for federated analysis with Python
+      slug: lancs-tre-proj-1-ws1
+      kubespawner_override:
+        image: ghcr.io/karectl/marimo-notebook-workspace:latest
+        env:
+        - name: PROJECT_NAME
+          value: lancs-tre-proj-1
+        - name: WORKSPACE
+          value: /lancs-tre-proj-1/ws1
+    storage:
+      default_notebook_size: 5Gi
+      persist: false
+  - name: guacamole
+    resource_type: VDI
+    enabled: true
+    scheduling:
+      resources:
+        requests_cpu: 500m
+        requests_memory: 1Gi
+        limits_cpu: '2'
+        limits_memory: 4Gi
+    storage:
+      default_vdi_size: 5Gi
+      persist: false
+  - resource_type: RStudio
+    name: rstudio
+    url: https://rstudio.lancs-tre-proj-1.example.com
+    enabled: false
+  - resource_type: Gitea
+    name: gitea
+    url: https://gitea.lancs-tre-proj-1.example.com
+    enabled: false

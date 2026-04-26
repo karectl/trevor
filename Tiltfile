@@ -33,6 +33,34 @@ k8s_yaml("deploy/dev/seaweedfs-buckets-job.yaml")
 k8s_yaml("deploy/dev/keycloak-realm.yaml")
 k8s_yaml("deploy/dev/keycloak.yaml")
 
+# ── CR8TOR CRDs + sample project ─────────────────────────────────────────────
+# CRD definitions must be applied before CR instances.
+k8s_yaml(listdir("deploy/dev/crds/"))
+k8s_yaml(listdir("deploy/dev/sample-project/"))
+k8s_resource(
+    new_name="cr8tor-crds",
+    objects=[
+        "projects.research.karectl.io:customresourcedefinition",
+        "users.identity.karectl.io:customresourcedefinition",
+        "groups.identity.karectl.io:customresourcedefinition",
+        "keycloakclients.identity.karectl.io:customresourcedefinition",
+        "vdiinstances.karectl.io:customresourcedefinition",
+    ],
+    labels=["cr8tor"],
+)
+k8s_resource(
+    new_name="sample-project",
+    objects=[
+        "lancs-tre-proj-1:project",
+        "hardingmp:user",
+        "lancs-tre-proj-1:group",
+        "lancs-tre-proj-1-analyst:group",
+        "lancs-tre-proj-1-admin:group",
+    ],
+    resource_deps=["cr8tor-crds"],
+    labels=["cr8tor"],
+)
+
 # ── Helm release (trevor app + worker) ────────────────────────────────────────
 k8s_yaml(
     helm(

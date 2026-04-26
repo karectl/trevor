@@ -59,6 +59,19 @@ Port forwards active while Tilt is running:
 | 5432 | PostgreSQL (`trevor` / `trevor`) |
 | 6379 | Redis |
 
+### CR8TOR sample project
+
+Tilt automatically applies KARECTL CRD definitions and a sample project (`lancs-tre-proj-1`) with one user (`hardingmp`) and group memberships. These live in:
+
+- `deploy/dev/crds/` — CustomResourceDefinition models (Project, User, Group, KeycloakClient, VDIInstance)
+- `deploy/dev/sample-project/` — CR instances for the cardiometabolicfactors sample project
+
+The CRDs are applied first, then the sample CRs (Tilt manages the dependency ordering). You can inspect them with:
+
+```bash
+kubectl get projects,users,groups -n trevor-dev
+```
+
 ### Run Alembic migrations against the Tilt PostgreSQL
 
 ```bash
@@ -82,7 +95,7 @@ uv run pytest -v       # tests (in-memory SQLite)
 Tests use in-memory SQLite with `DEV_AUTH_BYPASS=true`. No external services needed.
 
 ```bash
-uv run pytest -v                 # full suite (111 tests)
+uv run pytest -v                 # full suite (138 tests)
 uv run pytest tests/test_ui.py   # just UI tests
 uv run pytest -k "test_rules"    # just rule engine tests
 ```

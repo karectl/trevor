@@ -1,0 +1,15 @@
+apiVersion: identity.karectl.io/v1alpha1
+kind: User
+metadata:
+  name: hardingmp
+  namespace: trevor-dev
+  labels:
+    cr8tor.io/created-at: '20260413'
+spec:
+  username: hardingmp
+  given_name: Mike
+  family_name: Harding
+  affiliation: Lancaster University
+  email: mph@lancaster.ac.uk
+  enabled: true
+  password: hardingmp

@@ -1,0 +1,12 @@
+apiVersion: identity.karectl.io/v1alpha1
+kind: Group
+metadata:
+  name: lancs-tre-proj-1-admin
+  namespace: trevor-dev
+  labels:
+    cr8tor.io/project-id: 355783fb-a6c8-4a39-80aa-4a57c8c90a8a
+    cr8tor.io/created-at: '20260413'
+spec:
+  description: Admin subgroup for lancs-tre-proj-1
+  projects:
+  - lancs-tre-proj-1
