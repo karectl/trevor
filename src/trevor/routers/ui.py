@@ -903,8 +903,12 @@ async def review_submit(
     req = await session.get(AirlockRequest, request_id)
     if not req:
         raise HTTPException(status_code=404)
-    if req.status != AirlockRequestStatus.HUMAN_REVIEW:
-        raise HTTPException(status_code=409, detail="Request is not yet ready for human review")
+    if req.status not in (
+        AirlockRequestStatus.SUBMITTED,
+        AirlockRequestStatus.AGENT_REVIEW,
+        AirlockRequestStatus.HUMAN_REVIEW,
+    ):
+        raise HTTPException(status_code=409, detail="Request is not in a reviewable state")
 
     # Parse per-object decisions from form
     form_data = await request.form()

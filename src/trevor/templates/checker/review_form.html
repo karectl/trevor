@@ -8,13 +8,14 @@
   <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
 </head>
 <body>
-<div class="rv-shell" data-signals="{selected: 0}">
+<div class="rv-shell" data-signals="{selected: 0, {% for obj in objects %}{% if obj.state.value == 'PENDING' %}dec_{{ obj.id|replace('-','_') }}: ''{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}}">
 
-  {# Hidden per-object decision inputs — always present so button clicks can write to them.
-     form="review-form" associates them with the submit form when it is rendered. #}
+  {# Hidden per-object decision inputs synced from Datastar signals.
+     form="review-form" associates them with the submit form. #}
   {% for obj in objects %}
   {% if obj.state.value == "PENDING" %}
-  <input type="hidden" id="obj_{{ obj.id }}_decision" name="obj_{{ obj.id }}_decision" value="" form="review-form">
+  <input type="hidden" id="obj_{{ obj.id }}_decision" name="obj_{{ obj.id }}_decision" form="review-form"
+         data-bind="dec_{{ obj.id|replace('-','_') }}">
   {% endif %}
   {% endfor %}
 
@@ -204,23 +205,22 @@
             A comment is required when not approving.
           </p>
           <div class="rv-btn-group">
-            <button type="button" class="rv-approve-btn"
-                    data-on:click="document.getElementById('obj_{{ obj.id }}_decision').value='approved';
-                                   this.classList.add('rv-btn-active');
-                                   this.nextElementSibling.nextElementSibling.classList.remove('rv-btn-active')">
+            <button type="button"
+                    class="rv-approve-btn"
+                    data-class:rv-btn-active="$dec_{{ obj.id|replace('-','_') }} === 'approved'"
+                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'approved'">
               Approve
             </button>
-            <button type="button" class="rv-changes-btn"
-                    data-on:click="document.getElementById('obj_{{ obj.id }}_decision').value='changes_requested';
-                                   this.classList.add('rv-btn-active');
-                                   this.previousElementSibling.classList.remove('rv-btn-active');
-                                   this.nextElementSibling.classList.remove('rv-btn-active')">
+            <button type="button"
+                    class="rv-changes-btn"
+                    data-class:rv-btn-active="$dec_{{ obj.id|replace('-','_') }} === 'changes_requested'"
+                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'changes_requested'">
               Request changes
             </button>
-            <button type="button" class="rv-reject-btn"
-                    data-on:click="document.getElementById('obj_{{ obj.id }}_decision').value='rejected';
-                                   this.classList.add('rv-btn-active');
-                                   this.previousElementSibling.previousElementSibling.classList.remove('rv-btn-active')">
+            <button type="button"
+                    class="rv-reject-btn"
+                    data-class:rv-btn-active="$dec_{{ obj.id|replace('-','_') }} === 'rejected'"
+                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'rejected'">
               Reject
             </button>
           </div>
@@ -253,10 +253,11 @@
   <footer class="rv-footer">
     {% if agent_review_pending %}
     <div class="rv-footer-pending">
-      Agent review is in progress. You can read the request but cannot submit your review until it completes.
+      Agent review is still in progress — you can submit your review now, but you will be deciding without agent input.
     </div>
-    {% else %}
-    <form id="review-form" method="post" action="/ui/review/{{ airlock_request.id }}" class="rv-footer-form">
+    {% endif %}
+    <form id="review-form" method="post" action="/ui/review/{{ airlock_request.id }}" class="rv-footer-form"
+          {% if agent_review_pending %}onsubmit="return confirm('Agent review has not completed. Are you sure you want to submit your review without agent input?')"{% endif %}>
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
       <div class="rv-footer-left">
@@ -274,7 +275,6 @@
         <button type="submit" class="btn btn-primary">Submit Review</button>
       </div>
     </form>
-    {% endif %}
   </footer>
 
 </div>{# rv-shell #}
