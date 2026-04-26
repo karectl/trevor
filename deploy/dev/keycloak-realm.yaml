@@ -16,7 +16,23 @@ data:
           "standardFlowEnabled": true,
           "redirectUris": ["http://localhost:8000/*"],
           "webOrigins": ["http://localhost:8000"],
-          "directAccessGrantsEnabled": true
+          "directAccessGrantsEnabled": true,
+          "protocolMappers": [
+            {
+              "name": "realm roles",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-realm-role-mapper",
+              "consentRequired": false,
+              "config": {
+                "multivalued": "true",
+                "userinfo.token.claim": "true",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "realm_access.roles",
+                "jsonType.label": "String"
+              }
+            }
+          ]
         }
       ],
       "roles": {
