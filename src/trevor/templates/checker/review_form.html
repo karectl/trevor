@@ -105,6 +105,15 @@
         </div>
         {% endif %}
 
+        {# ---- File preview ---- #}
+        {% set preview = object_previews.get(obj.id|string) %}
+        {% if preview %}
+        <div class="rv-section">
+          <h3>File preview</h3>
+          {% include "components/file_preview.html" with context %}
+        </div>
+        {% endif %}
+
         {# ---- Agent assessment for this object ---- #}
         {% set assessment = agent_assessments.get(obj.id|string) %}
         {% if assessment %}

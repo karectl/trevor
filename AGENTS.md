@@ -36,7 +36,7 @@ No `make`, `just`, or `task` — `uv run` only.
 | Orchestration | Kubernetes (Tilt + k3d for local dev) |
 | Agent | Pydantic-AI (OpenAI-compatible backend) |
 | RO-Crate | `rocrate` |
-| File preview | `mistune`, `polars`, `pygments` |
+| File preview | `mistune`, `polars`, `pygments`, `nh3` |
 | Notifications | In-app (`Notification` table, `InAppBackend`); SMTP (`SmtpBackend`, `aiosmtplib`) |
 | Linting | `ruff` |
 | Pre-commit | `prek` |
@@ -70,6 +70,7 @@ src/trevor/
     release_service.py      # assemble_and_release(), RO-Crate + zip
     metrics_service.py      # admin dashboard queries
     notification_service.py # NotificationEvent, InAppBackend, SmtpBackend, NotificationRouter, create_event, get_router
+    preview_service.py      # render_preview — CSV/TSV/Parquet/Markdown/code/image → sanitised HTML (nh3)
     email_templates/        # 7 event dirs (subject.txt, body.html, body.txt) for SmtpBackend
     crd_sync_service.py     # reconcile_projects/users/memberships (pure, no k8s dep)
   routers/
@@ -93,7 +94,7 @@ src/trevor/
   static/style.css    # custom properties, status colours, notification styles
 tests/
   conftest.py         # in-memory SQLite, client/admin_client fixtures, DEV_AUTH_BYPASS
-  test_*.py           # 240 tests across 17 files
+  test_*.py           # 252 tests across 18 files
 alembic/versions/     # async migrations
 deploy/dev/
   crds/               # CRD schemas (Project, User, Group, KeycloakClient, VDI)

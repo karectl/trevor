@@ -33,6 +33,7 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy>=0.46b0",
     "kubernetes>=31.0",
     "aiosmtplib>=3.0",
+    "nh3>=0.3.5",
 ]
 
 [project.scripts]

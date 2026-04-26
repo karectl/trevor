@@ -1,13 +1,15 @@
-<div class="preview-panel" id="preview-{{ object_id }}">
+<div class="preview-panel" id="preview-{{ obj.id }}">
+  {% set preview_type = preview.preview_type %}
+  {% set preview_content = preview.preview_content %}
   {% if preview_type == "html_table" %}
-  {{ preview_content|safe }}
+  <div class="preview-table-wrapper">{{ preview_content|safe }}</div>
   {% elif preview_type == "markdown" %}
-  {{ preview_content|safe }}
+  <div class="preview-markdown">{{ preview_content|safe }}</div>
   {% elif preview_type == "code" %}
-  {{ preview_content|safe }}
+  <div class="preview-code">{{ preview_content|safe }}</div>
   {% elif preview_type == "image" %}
-  <img src="{{ preview_url }}" alt="{{ filename }}" style="max-width:100%;max-height:400px;">
+  <div class="preview-image">{{ preview_content|safe }}</div>
   {% else %}
-  <pre>{{ preview_content }}</pre>
+  <pre class="preview-text">{{ preview_content }}</pre>
   {% endif %}
 </div>

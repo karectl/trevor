@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,7 @@ from trevor.services import audit_service
 from trevor.settings import Settings, get_settings
 
 router = APIRouter(prefix="/ui", tags=["ui"])
+logger = logging.getLogger(__name__)
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -675,6 +677,26 @@ async def review_form(
             if isinstance(finding, dict) and "object_id" in finding:
                 agent_assessments[str(finding["object_id"])] = finding
 
+    # File previews — best-effort; skip when S3 is not configured
+    settings_val: Settings = get_settings()
+    object_previews: dict[str, dict] = {}
+    if settings_val.s3_endpoint_url or settings_val.s3_access_key_id:
+        from trevor.services.preview_service import render_preview
+        from trevor.storage import download_object
+
+        for obj in objects:
+            try:
+                content = await download_object(
+                    bucket=settings_val.s3_quarantine_bucket,
+                    key=obj.storage_key,
+                    settings=settings_val,
+                )
+                preview = render_preview(obj.filename, content)
+                if preview:
+                    object_previews[str(obj.id)] = preview
+            except Exception:
+                logger.debug("preview unavailable for %s", obj.filename, exc_info=True)
+
     ctx = _base_ctx(request, auth)
     ctx.update(
         airlock_request=req,
@@ -682,6 +704,7 @@ async def review_form(
         object_metadata=object_metadata,
         agent_review=agent_review,
         agent_assessments=agent_assessments,
+        object_previews=object_previews,
     )
     return templates.TemplateResponse("checker/review_form.html", ctx)
 

@@ -37,7 +37,7 @@ graph LR
 | Orchestration | Kubernetes (Tilt + k3d/kind for local dev) |
 | Agent framework | Pydantic-AI (OpenAI-compatible backend) |
 | RO-Crate | `rocrate` Python library |
-| File preview | `mistune`, `polars`, `pygments` |
+| File preview | `mistune`, `polars`, `pygments`, `nh3` |
 
 Stack is fixed by [constraint C-13](spec/constraints.md). Deviations require a new ADR.
 
@@ -149,6 +149,7 @@ src/trevor/
     release_service.py     # RO-Crate assembly, zip building
     metrics_service.py     # admin dashboard queries, pipeline metrics
     notification_service.py  # NotificationEvent, InAppBackend, SmtpBackend, NotificationRouter, get_router
+    preview_service.py       # render_preview — CSV/TSV/Parquet/Markdown/code/image → sanitised HTML
     email_templates/         # 7 event dirs (subject.txt, body.html, body.txt) for SmtpBackend
     crd_sync_service.py    # CRD reconcile logic (projects, users, researcher memberships)
    routers/
@@ -167,7 +168,7 @@ src/trevor/
    static/                  # CSS (no JS build step)
 tests/
   conftest.py              # fixtures: in-memory SQLite, clients, sample data
-  test_*.py                # 240 tests across 17 test files
+  test_*.py                # 252 tests across 18 test files
 alembic/                   # async Alembic config + migrations
 docs/                      # this documentation (zensical)
 helm/trevor/               # Helm chart skeleton
