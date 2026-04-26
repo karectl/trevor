@@ -99,7 +99,18 @@
             &middot; {{ (obj.size_bytes / 1024)|round(1) }}KB
           </div>
         </div>
-        <span class="obj-state-dot dot-{{ obj.state }}"></span>
+        <span class="obj-state-dot dot-{{ obj.state }}"
+              {% if obj.state.value == "PENDING" %}
+              data-show="$dec_{{ obj.id|replace('-','_') }} === ''"
+              {% endif %}></span>
+        {% if obj.state.value == "PENDING" %}
+        <span class="rv-dec-icon rv-dec-approved" style="display:none"
+              data-show="$dec_{{ obj.id|replace('-','_') }} === 'approved'">&#10003;</span>
+        <span class="rv-dec-icon rv-dec-changes" style="display:none"
+              data-show="$dec_{{ obj.id|replace('-','_') }} === 'changes_requested'">&#9651;</span>
+        <span class="rv-dec-icon rv-dec-rejected" style="display:none"
+              data-show="$dec_{{ obj.id|replace('-','_') }} === 'rejected'">&#9632;</span>
+        {% endif %}
       </div>
       {% endfor %}
     </aside>
@@ -295,15 +306,15 @@
           <span class="rv-derived-badge rv-derived-approved"
                 style="display:none"
                 data-show="$overall === 'approved'"
-                >Approve all</span>
+                >&#10003; Approve all</span>
           <span class="rv-derived-badge rv-derived-changes"
                 style="display:none"
                 data-show="$overall === 'changes_requested'"
-                >Request changes</span>
+                >&#9651; Request changes</span>
           <span class="rv-derived-badge rv-derived-rejected"
                 style="display:none"
                 data-show="$overall === 'rejected'"
-                >Reject</span>
+                >&#9632; Reject</span>
         </div>
       </div>
       <div class="rv-footer-center">

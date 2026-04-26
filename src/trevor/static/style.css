@@ -307,12 +307,15 @@ textarea { resize: vertical; min-height: 80px; }
   border: none; padding: 7px 20px; font-size: .85rem; cursor: pointer;
   font-family: var(--font); transition: background .1s;
 }
-.rv-approve-btn { background: #e9f6ec; color: #1d7a3a; border-right: 1px solid #b8d8be; }
-.rv-reject-btn { background: #f5f5f5; color: var(--text); }
-.rv-approve-btn:hover { background: #d8f0de; }
-.rv-reject-btn:hover { background: #e8e8e8; }
-.rv-approve-btn.rv-btn-active { background: #48bb78; color: #fff; }
-.rv-reject-btn.rv-btn-active { background: #f56565; color: #fff; }
+.rv-approve-btn  { background: #e9f6ec; color: #1d7a3a; border-right: 1px solid #b8d8be; }
+.rv-changes-btn  { background: #fef6e9; color: #7a4a1d; border-right: 1px solid #e8d8b0; border-left: 1px solid #e8d8b0; }
+.rv-reject-btn   { background: #f5f5f5; color: var(--text); }
+.rv-approve-btn:hover  { background: #d8f0de; }
+.rv-changes-btn:hover  { background: #fdecd0; }
+.rv-reject-btn:hover   { background: #e8e8e8; }
+.rv-approve-btn.rv-btn-active  { background: #48bb78; color: #fff; }
+.rv-changes-btn.rv-btn-active  { background: #ed8936; color: #fff; }
+.rv-reject-btn.rv-btn-active   { background: #f56565; color: #fff; }
 .rv-comment textarea {
   width: 100%; min-height: 60px; border: 1px solid var(--border);
   border-radius: var(--radius); padding: 8px; font-family: var(--font); font-size: .85rem;
@@ -333,11 +336,16 @@ textarea { resize: vertical; min-height: 80px; }
 .rv-footer-radios { display: flex; gap: 12px; font-size: .85rem; }
 .rv-footer-radios label { display: flex; align-items: center; gap: 4px; margin-bottom: 0; font-weight: 400; }
 .rv-footer-derived { display: flex; align-items: center; }
-.rv-derived-badge { font-size: .85rem; font-weight: 600; padding: 3px 10px; border-radius: var(--radius); }
-.rv-derived-undecided { background: var(--surface-alt, #f3f4f6); color: var(--text-muted); }
-.rv-derived-approved  { background: #dcfce7; color: #15803d; }
-.rv-derived-changes   { background: #fef9c3; color: #a16207; }
-.rv-derived-rejected  { background: #fee2e2; color: #b91c1c; }
+.rv-derived-badge { font-size: .9rem; font-weight: 600; padding: 5px 14px; border-radius: var(--radius); }
+.rv-derived-undecided { background: var(--surface-alt, #f3f4f6); color: var(--text-muted); font-weight: 400; font-style: italic; }
+.rv-derived-approved  { background: #48bb78; color: #fff; }
+.rv-derived-changes   { background: #ed8936; color: #fff; }
+.rv-derived-rejected  { background: #f56565; color: #fff; }
+/* Sidebar per-object decision icons */
+.rv-dec-icon { font-size: .8rem; font-weight: 700; line-height: 1; flex-shrink: 0; }
+.rv-dec-approved { color: #1d7a3a; }
+.rv-dec-changes  { color: #7a4a1d; }
+.rv-dec-rejected { color: #b91c1c; }
 .btn-disabled, button:disabled { opacity: .45; cursor: not-allowed; }
 .rv-footer-center { flex: 1; }
 .rv-summary-input {
