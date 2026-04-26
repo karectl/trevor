@@ -1,0 +1,16 @@
+- generic [ref=e2]:
+  - generic [ref=e4]: karectl
+  - generic [ref=e5]:
+    - banner [ref=e6]:
+      - heading "Sign in to your account" [level=1] [ref=e7]
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]: Username or email
+        - textbox "Username or email" [ref=e15]
+      - generic [ref=e16]:
+        - generic [ref=e17]: Password
+        - generic [ref=e18]:
+          - textbox "Password" [ref=e19]
+          - button "Show password" [ref=e20] [cursor=pointer]:
+            - generic [ref=e21]: 
+      - button "Sign In" [ref=e23] [cursor=pointer]

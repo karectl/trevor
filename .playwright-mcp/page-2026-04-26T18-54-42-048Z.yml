@@ -1,0 +1,34 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]: trevor
+    - link "Requests" [ref=e6] [cursor=pointer]:
+      - /url: /ui/requests
+    - generic [ref=e7]:
+      - link "Notifications" [ref=e9] [cursor=pointer]:
+        - /url: /ui/notifications
+        - text: 🔔
+      - link "Log out" [ref=e10] [cursor=pointer]:
+        - /url: /auth/logout
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - heading "Create Request" [level=1] [ref=e13]
+      - paragraph [ref=e14]: Create a new airlock request for output release
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]: Project
+          - combobox "Project" [ref=e20]
+        - generic [ref=e21]:
+          - generic [ref=e22]: Direction
+          - combobox "Direction" [ref=e23]:
+            - option "Egress" [selected]
+            - option "Ingress"
+      - generic [ref=e24]:
+        - generic [ref=e25]: Title
+        - textbox "Title" [ref=e26]:
+          - /placeholder: Brief description of outputs
+      - generic [ref=e27]:
+        - generic [ref=e28]: Description
+        - textbox "Description" [ref=e29]:
+          - /placeholder: What these outputs contain and why they need release
+      - button "Create Request" [ref=e30] [cursor=pointer]

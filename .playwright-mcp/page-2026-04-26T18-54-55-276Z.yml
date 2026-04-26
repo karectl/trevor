@@ -1,0 +1,22 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]: trevor
+    - link "Requests" [ref=e6] [cursor=pointer]:
+      - /url: /ui/requests
+    - generic [ref=e7]:
+      - link "Notifications" [ref=e9] [cursor=pointer]:
+        - /url: /ui/notifications
+        - text: 🔔
+      - link "Log out" [ref=e10] [cursor=pointer]:
+        - /url: /auth/logout
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - heading "Notifications" [level=1] [ref=e13]
+      - button "Mark all read" [ref=e15] [cursor=pointer]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - generic [ref=e18]:
+          - strong [ref=e19]: Test notification
+          - generic [ref=e20]: 2026-04-26 18:54
+          - button "Mark read" [ref=e22] [cursor=pointer]
+        - paragraph [ref=e23]: A request was submitted.

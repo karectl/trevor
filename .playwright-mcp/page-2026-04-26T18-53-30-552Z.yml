@@ -1,0 +1,8 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]: trevor
+  - generic [ref=e6]:
+    - heading "500 — Internal Server Error" [level=1] [ref=e7]
+    - paragraph [ref=e8]: Something went wrong. Please try again or contact support.
+    - link "Back to requests" [ref=e9] [cursor=pointer]:
+      - /url: /ui/requests

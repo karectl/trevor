@@ -1,0 +1,14 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]: trevor
+    - link "Requests" [ref=e6] [cursor=pointer]:
+      - /url: /ui/requests
+    - generic [ref=e7]:
+      - link "Notifications" [ref=e9] [cursor=pointer]:
+        - /url: /ui/notifications
+        - text: 🔔
+      - link "Log out" [ref=e10] [cursor=pointer]:
+        - /url: /auth/logout
+  - generic [ref=e11]:
+    - heading "Notifications" [level=1] [ref=e13]
+    - paragraph [ref=e14]: No notifications yet.
