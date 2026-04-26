@@ -49,6 +49,8 @@ nav = [
   { "Architecture" = "architecture.md" },
   { "API Reference" = "api.md" },
   { "UI Guide" = "ui.md" },
+  { "Runbook" = "runbook.md" },
+  { "Security" = "security.md" },
   { "Developer Guide" = "guide/index.md" },
   { "Specification" = [
     "spec/index.md",
@@ -69,7 +71,8 @@ nav = [
       "spec/adrs/0010-two-person-review.md",
       "spec/adrs/0011-object-immutability.md",
       "spec/adrs/0012-cr8tor-crd-sync.md",
-    ]},
+      "spec/adrs/0013-seaweedfs-object-storage.md",
+    ] },
     { "Iteration Specs" = [
       "spec/iterations/iteration-2-spec.md",
       "spec/iterations/iteration-3-spec.md",
@@ -78,8 +81,12 @@ nav = [
       "spec/iterations/iteration-6-spec.md",
       "spec/iterations/iteration-7-spec.md",
       "spec/iterations/iteration-7.5-spec.md",
-    ]},
-  ]},
+      "spec/iterations/iteration-8-spec.md",
+      "spec/iterations/iteration-9-spec.md",
+      "spec/iterations/iteration-10-spec.md",
+      "spec/iterations/iteration-11-spec.md",
+    ] },
+  ] },
 ]
 
 # With the "extra_css" option you can add your own CSS styling to customize
