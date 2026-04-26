@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  namespace: trevor-dev
+data:
+  karectl-realm.json: |
+    {
+      "realm": "karectl",
+      "enabled": true,
+      "clients": [
+        {
+          "clientId": "trevor",
+          "enabled": true,
+          "publicClient": true,
+          "redirectUris": ["http://localhost:8000/*"],
+          "webOrigins": ["http://localhost:8000"],
+          "directAccessGrantsEnabled": true
+        }
+      ],
+      "roles": {
+        "realm": [
+          { "name": "tre_admin", "description": "TRE administrator" },
+          { "name": "researcher", "description": "Researcher" },
+          { "name": "output_checker", "description": "Output checker" },
+          { "name": "senior_checker", "description": "Senior checker" }
+        ]
+      },
+      "users": [
+        {
+          "username": "admin-user",
+          "email": "admin@test.local",
+          "firstName": "Admin",
+          "lastName": "User",
+          "enabled": true,
+          "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+          "realmRoles": ["tre_admin"]
+        },
+        {
+          "username": "researcher-1",
+          "email": "researcher1@test.local",
+          "firstName": "Alice",
+          "lastName": "Researcher",
+          "enabled": true,
+          "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+          "realmRoles": ["researcher"]
+        },
+        {
+          "username": "checker-1",
+          "email": "checker1@test.local",
+          "firstName": "Bob",
+          "lastName": "Checker",
+          "enabled": true,
+          "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+          "realmRoles": ["output_checker"]
+        },
+        {
+          "username": "checker-2",
+          "email": "checker2@test.local",
+          "firstName": "Carol",
+          "lastName": "Senior",
+          "enabled": true,
+          "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+          "realmRoles": ["output_checker", "senior_checker"]
+        }
+      ]
+    }

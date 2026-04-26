@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seaweedfs-create-buckets
+  namespace: trevor-dev
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-buckets
+          image: amazon/aws-cli:2.15.0
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              value: "devaccess"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "devsecret"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+          command:
+            - sh
+            - -c
+            - |
+              ENDPOINT="http://seaweedfs:8333"
+              # Wait for S3 gateway
+              until aws s3api list-buckets --endpoint-url "$ENDPOINT" 2>/dev/null; do
+                echo "Waiting for SeaweedFS S3..."
+                sleep 2
+              done
+              aws s3 mb "s3://trevor-quarantine" --endpoint-url "$ENDPOINT" || true
+              aws s3 mb "s3://trevor-release" --endpoint-url "$ENDPOINT" || true
+              echo "Buckets created."

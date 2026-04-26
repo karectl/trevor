@@ -9,7 +9,7 @@ icon: lucide/code
 - Python 3.13 (pinned in `.python-version`)
 - [`uv`](https://docs.astral.sh/uv/) 0.11+
 
-No other tools needed for running tests. Full local dev stack additionally needs: k3d/kind, MinIO, Keycloak, Redis.
+No other tools needed for running tests. Full local dev stack additionally needs: Docker, k3d 5.7+, kubectl, Helm 3.14+, Tilt 0.33+.
 
 ## Quick start
 
@@ -23,6 +23,59 @@ uv run zensical serve            # serve docs locally
 ```
 
 All commands go through `uv run`. No `make`, `just`, or `task`.
+
+## Local dev stack (Tilt + k3d)
+
+Brings up PostgreSQL, Redis, SeaweedFS (S3), and Keycloak inside a local k3d cluster with live-reload.
+
+### Devcontainer (recommended)
+
+Open the repo in VS Code and choose **Reopen in Container**. The post-create script installs all tools, creates the k3d cluster, and runs `uv sync` automatically.
+
+```bash
+tilt up   # start dev stack (run inside container)
+```
+
+### Bare-metal
+
+```bash
+# One-time cluster setup (requires Docker, k3d, Tilt, Helm, uv)
+./scripts/dev-setup.sh
+
+# Start dev stack
+tilt up
+
+# Teardown
+./scripts/dev-teardown.sh
+```
+
+Port forwards active while Tilt is running:
+
+| Port | Service |
+|---|---|
+| 8000 | trevor API |
+| 8080 | Keycloak admin console (`admin` / `admin`) |
+| 8333 | SeaweedFS S3 gateway (`devaccess` / `devsecret`) |
+| 5432 | PostgreSQL (`trevor` / `trevor`) |
+| 6379 | Redis |
+
+### Run Alembic migrations against the Tilt PostgreSQL
+
+```bash
+# With port-forward active:
+DATABASE_URL=postgresql+asyncpg://trevor:trevor@localhost:5432/trevor uv run alembic upgrade head
+```
+
+### SQLite-only (no Kubernetes)
+
+For fast iteration without any infrastructure:
+
+```bash
+uv sync
+# .env has DEV_AUTH_BYPASS=true and SQLite DATABASE_URL
+uv run trevor          # API on :8000
+uv run pytest -v       # tests (in-memory SQLite)
+```
 
 ## Testing
 

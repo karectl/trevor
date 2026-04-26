@@ -1,0 +1,27 @@
+{
+  "name": "trevor",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "minikube": "none",
+      "helm": "latest",
+      "kubectl": "latest"
+    }
+  },
+  "postCreateCommand": ".devcontainer/post-create.sh",
+  "forwardPorts": [8000, 8080, 8333, 5432, 6379],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "redhat.vscode-yaml",
+        "tilt-dev.tiltfile"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": ".venv/bin/python"
+      }
+    }
+  }
+}
