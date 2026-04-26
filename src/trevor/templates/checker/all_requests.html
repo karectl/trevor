@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}All Requests — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>All Requests</h1>
+    <p>Every request across your projects, most recent first</p>
+  </div>
+</div>
+
+{% if requests %}
+<div class="card">
+<table>
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Project</th>
+      <th>Status</th>
+      <th>Objects</th>
+      <th>Updated</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in requests %}
+    <tr>
+      <td>{{ row.req.title }}</td>
+      <td class="text-muted text-sm">{{ row.project_name }}</td>
+      <td><span class="badge badge-{{ row.req.status }}">{{ row.req.status|replace("_", " ") }}</span></td>
+      <td>{{ row.object_count }}</td>
+      <td class="text-muted text-sm">{{ row.req.updated_at.strftime('%Y-%m-%d %H:%M') if row.req.updated_at else '-' }}</td>
+      <td><a href="/ui/review/{{ row.req.id }}" class="btn btn-sm btn-primary">View</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state"><p>No requests found across your projects.</p></div>
+{% endif %}
+{% endblock %}

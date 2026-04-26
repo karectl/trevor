@@ -82,7 +82,17 @@ async def _user_projects(
 
 
 @router.get("/", response_class=HTMLResponse)
-async def ui_root() -> RedirectResponse:
+async def ui_root(auth: CurrentAuth, session: Session) -> RedirectResponse:
+    checker_roles = (ProjectRole.OUTPUT_CHECKER, ProjectRole.SENIOR_CHECKER)
+    result = await session.exec(
+        select(ProjectMembership).where(
+            ProjectMembership.user_id == auth.user.id,
+            ProjectMembership.role.in_(checker_roles),
+        )
+    )
+    is_checker = result.first() is not None
+    if is_checker and not auth.is_admin:
+        return RedirectResponse("/ui/review", status_code=302)
     return RedirectResponse("/ui/requests", status_code=302)
 
 
@@ -809,6 +819,51 @@ async def review_request_list(
     ctx = _base_ctx(request, auth)
     ctx.update(project=project, requests=augmented)
     return templates.TemplateResponse("checker/request_list.html", ctx)
+
+
+@router.get("/checker/requests", response_class=HTMLResponse)
+async def checker_all_requests(
+    request: Request,
+    auth: CurrentAuth,
+    session: Session,
+) -> HTMLResponse:
+    """All requests ever visible to this checker, across all their projects."""
+    pids = await _checker_project_ids(auth.user.id, session, is_admin=auth.is_admin)
+
+    if pids:
+        query = (
+            select(AirlockRequest)
+            .where(
+                AirlockRequest.project_id.in_(pids),
+                # Exclude DRAFT — checkers should never see those
+                AirlockRequest.status != AirlockRequestStatus.DRAFT,
+            )
+            .order_by(AirlockRequest.updated_at.desc())
+        )
+        result = await session.exec(query)
+        reqs = list(result.all())
+    else:
+        reqs = []
+
+    augmented = []
+    for req in reqs:
+        obj_result = await session.exec(
+            select(OutputObject).where(
+                OutputObject.request_id == req.id,
+                OutputObject.state != OutputObjectState.SUPERSEDED,
+            )
+        )
+        object_count = len(list(obj_result.all()))
+        project = await session.get(Project, req.project_id)
+        augmented.append({
+            "req": req,
+            "object_count": object_count,
+            "project_name": project.display_name if project else str(req.project_id),
+        })
+
+    ctx = _base_ctx(request, auth)
+    ctx["requests"] = augmented
+    return templates.TemplateResponse("checker/all_requests.html", ctx)
 
 
 @router.get("/review/{request_id}", response_class=HTMLResponse)

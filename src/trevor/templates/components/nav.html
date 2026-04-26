@@ -3,6 +3,15 @@
     <img src="/static/trevor-icon.png" alt="" class="brand-icon">trevor
   </span>
   <div class="nav-links">
+    {% if is_checker and not is_admin %}
+    <a href="/ui/review" class="nav-link-with-badge">
+      Review Queue
+      <span data-on:load="@get('/ui/sse/review/queue-count')">
+        <span id="review-queue-count" class="badge badge-count"></span>
+      </span>
+    </a>
+    <a href="/ui/checker/requests">All Requests</a>
+    {% else %}
     <a href="/ui/requests">Requests</a>
     {% if is_checker or is_admin %}
     <a href="/ui/review" class="nav-link-with-badge">
@@ -11,6 +20,7 @@
         <span id="review-queue-count" class="badge badge-count"></span>
       </span>
     </a>
+    {% endif %}
     {% endif %}
     {% if is_admin %}
     <a href="/ui/admin">Admin</a>
