@@ -187,6 +187,30 @@ async def url_expiry_warning_job(ctx: dict[str, Any]) -> None:
     logger.info("url_expiry_warning_job ran (stub)")
 
 
+async def crd_sync_job(ctx: dict[str, Any]) -> None:
+    """Cron — reconcile CR8TOR CRDs into trevor DB every 5 minutes."""
+    from trevor.crd import list_group_crds, list_project_crds, list_user_crds
+    from trevor.services.crd_sync_service import full_reconcile
+
+    settings: Settings = ctx["settings"]
+    if not settings.crd_sync_enabled:
+        logger.debug("crd_sync_job: disabled, skipping")
+        return
+
+    try:
+        project_crds = await list_project_crds(settings.crd_namespace)
+        group_crds = await list_group_crds(settings.crd_namespace)
+        user_crds = await list_user_crds(settings.crd_namespace)
+    except Exception:
+        logger.exception("crd_sync_job: failed to list CRDs")
+        return
+
+    session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
+    async with session_factory() as session:
+        stats = await full_reconcile(project_crds, group_crds, user_crds, session)
+        logger.info("crd_sync_job: %s", stats)
+
+
 # ---------------------------------------------------------------------------
 # Startup / shutdown hooks
 # ---------------------------------------------------------------------------
@@ -218,6 +242,11 @@ class WorkerSettings:
     functions = [agent_review_job, release_job]
     cron_jobs = [
         cron(url_expiry_warning_job, hour={0}, minute=0, run_at_startup=False),
+        cron(
+            crd_sync_job,
+            minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55},
+            run_at_startup=True,
+        ),
     ]
     on_startup = startup
     on_shutdown = shutdown

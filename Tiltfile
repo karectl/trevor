@@ -32,6 +32,7 @@ k8s_yaml("deploy/dev/seaweedfs.yaml")
 k8s_yaml("deploy/dev/seaweedfs-buckets-job.yaml")
 k8s_yaml("deploy/dev/keycloak-realm.yaml")
 k8s_yaml("deploy/dev/keycloak.yaml")
+k8s_yaml("deploy/dev/rbac-crd-reader.yaml")
 
 # ── CR8TOR CRDs + sample project ─────────────────────────────────────────────
 # CRD definitions must be applied before CR instances.
@@ -87,6 +88,10 @@ k8s_yaml(
             "env.S3_QUARANTINE_BUCKET=trevor-quarantine",
             "env.S3_RELEASE_BUCKET=trevor-release",
             "env.SECRET_KEY=tilt-dev-secret-key",
+            "env.CRD_SYNC_ENABLED=true",
+            "env.CRD_NAMESPACE=trevor-dev",
+            "migrations.enabled=true",
+            "migrations.hookEnabled=false",
         ],
     )
 )

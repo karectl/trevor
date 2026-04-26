@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     otel_exporter_endpoint: str = "http://otel-collector:4317"
     otel_service_name: str = "trevor"
 
+    # CRD sync
+    crd_namespace: str = "trevor-dev"
+    crd_sync_enabled: bool = False  # disabled in tests; enabled in Tilt via env
+
 
 def get_settings() -> Settings:
     return Settings()

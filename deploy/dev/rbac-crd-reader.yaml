@@ -1,0 +1,24 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: trevor-crd-reader
+rules:
+  - apiGroups: ["research.karectl.io"]
+    resources: ["projects"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["identity.karectl.io"]
+    resources: ["groups", "users"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: trevor-crd-reader
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: trevor-dev
+roleRef:
+  kind: ClusterRole
+  name: trevor-crd-reader
+  apiGroup: rbac.authorization.k8s.io

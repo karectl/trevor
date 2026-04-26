@@ -25,7 +25,8 @@
         "charliermarsh.ruff",
         "ms-python.python",
         "redhat.vscode-yaml",
-        "tilt-dev.tiltfile"
+        "tilt-dev.tiltfile",
+        "tamasfe.even-better-toml"
       ],
       "settings": {
         "python.defaultInterpreterPath": ".venv/bin/python"
