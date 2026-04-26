@@ -252,6 +252,7 @@ Keycloak admin: `admin` / `admin` at `http://localhost:8080`.
 
 ## Git workflow
 
+- Review and if necessary update docs, AGENTS.md and README.md before committing to ensure they stay up to date with code changes.
 - Commit after each discrete piece of work. Do not batch unrelated changes.
 - Conventional Commits. Subject ≤50 chars; body only when "why" isn't obvious.
 - Run before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest -v`
