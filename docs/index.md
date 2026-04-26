@@ -4,7 +4,7 @@ icon: lucide/shield
 
 # trevor
 
-Egress/airlock microservice for the [KARECTL](https://karectl.io) Trusted Research Environment (TRE). Manages controlled import and export of research outputs across the TRE security boundary.
+Egress/airlock microservice for the KARECTL Trusted Research Environment (TRE). Manages controlled import and export of research objects (code, outputs, etc.) across the TRE security boundary.
 
 ## What trevor does
 

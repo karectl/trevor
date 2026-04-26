@@ -1152,12 +1152,71 @@ async def ingress_deliver(
     req.status = AirlockRequestStatus.RELEASED
     req.closed_at = now
     session.add(req)
-    await audit_service.emit(
-        session,
-        event_type="request.released",
-        actor_id=str(auth.user.id),
-        request_id=request_id,
-        payload={"delivery_record_id": str(record.id)},
-    )
     await session.commit()
     return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Notification list UI
+# ---------------------------------------------------------------------------
+
+
+@router.get("/notifications", response_class=HTMLResponse)
+async def notification_list(
+    request: Request,
+    auth: CurrentAuth,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> HTMLResponse:
+    """Render the notification inbox for the current user."""
+    from trevor.models.notification import Notification
+
+    result = await session.exec(
+        select(Notification)
+        .where(Notification.user_id == auth.user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(50)
+    )
+    notifications = result.all()
+    ctx = _base_ctx(request, auth)
+    ctx["notifications"] = notifications
+    return templates.TemplateResponse(request, "notifications/list.html", ctx)
+
+
+@router.post("/notifications/{notification_id}/read", response_class=HTMLResponse)
+async def notification_mark_read(
+    notification_id: uuid.UUID,
+    auth: CurrentAuth,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> RedirectResponse:
+    """Mark a notification as read (form POST from UI)."""
+    from trevor.models.notification import Notification
+
+    notification = await session.get(Notification, notification_id)
+    if notification and notification.user_id == auth.user.id:
+        notification.read = True
+        session.add(notification)
+        await session.commit()
+    return RedirectResponse("/ui/notifications", status_code=303)
+
+
+@router.post("/notifications/mark-all-read", response_class=HTMLResponse)
+async def notification_mark_all_read(
+    auth: CurrentAuth,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> RedirectResponse:
+    """Mark all notifications read (form POST from UI)."""
+    from sqlmodel import select
+
+    from trevor.models.notification import Notification
+
+    result = await session.exec(
+        select(Notification).where(
+            Notification.user_id == auth.user.id,
+            Notification.read == False,  # noqa: E712
+        )
+    )
+    for n in result.all():
+        n.read = True
+        session.add(n)
+    await session.commit()
+    return RedirectResponse("/ui/notifications", status_code=303)

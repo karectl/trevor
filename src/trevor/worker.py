@@ -142,6 +142,12 @@ async def agent_review_job(ctx: dict[str, Any], request_id: str) -> None:
             await session.commit()
             logger.info("agent_review_job: completed for request %s", request_id)
 
+            # Notify checkers that agent review is ready
+            if "redis" in ctx:
+                await ctx["redis"].enqueue_job(
+                    "send_notifications_job", "agent_review.ready", request_id
+                )
+
         except Exception:
             logger.exception("agent_review_job: failed for request %s", request_id)
             # Emit failure audit event
@@ -174,9 +180,55 @@ async def release_job(ctx: dict[str, Any], request_id: str) -> None:
         try:
             await assemble_and_release(req_uuid, session, settings)
             logger.info("release_job: completed for request %s", request_id)
+            # Notify researcher that release is complete
+            if "redis" in ctx:
+                await ctx["redis"].enqueue_job(
+                    "send_notifications_job", "request.released", request_id
+                )
         except Exception:
             logger.exception("release_job: failed for request %s", request_id)
             raise
+
+
+async def send_notifications_job(
+    ctx: dict[str, Any],
+    event_type: str,
+    request_id: str,
+) -> None:
+    """Dispatch a notification event for a given request and event type."""
+    from trevor.models.request import AirlockRequest
+    from trevor.services.notification_service import create_event, get_router
+
+    settings: Settings = ctx["settings"]
+    if not settings.notifications_enabled:
+        logger.debug("send_notifications_job: notifications disabled, skipping")
+        return
+
+    import uuid as _uuid
+
+    req_uuid = _uuid.UUID(request_id)
+    session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
+
+    async with session_factory() as session:
+        req = await session.get(AirlockRequest, req_uuid)
+        if req is None:
+            logger.error("send_notifications_job: request %s not found", request_id)
+            return
+
+        event = await create_event(event_type, req, session)
+        if not event.recipient_user_ids:
+            logger.debug("send_notifications_job: no recipients for %s", event_type)
+            return
+
+        router = get_router(settings)
+        await router.dispatch(event, session)
+        await session.commit()
+        logger.info(
+            "send_notifications_job: dispatched %s for request %s to %d recipients",
+            event_type,
+            request_id,
+            len(event.recipient_user_ids),
+        )
 
 
 async def url_expiry_warning_job(ctx: dict[str, Any]) -> None:
@@ -239,7 +291,7 @@ class WorkerSettings:
     settings = get_settings()
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
 
-    functions = [agent_review_job, release_job]
+    functions = [agent_review_job, release_job, send_notifications_job]
     cron_jobs = [
         cron(url_expiry_warning_job, hour={0}, minute=0, run_at_startup=False),
         cron(

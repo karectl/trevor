@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Notifications</h1>
+  {% if notifications %}
+  <form method="post" action="/notifications/mark-all-read">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if not notifications %}
+  <p class="empty-state">No notifications yet.</p>
+{% else %}
+  <ul class="notif-list">
+  {% for n in notifications %}
+    <li class="notif-item {% if not n.read %}notif-unread{% endif %}">
+      <div class="notif-header">
+        <strong class="notif-title">{{ n.title }}</strong>
+        <span class="notif-time">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        {% if not n.read %}
+          <form method="post" action="/notifications/{{ n.id }}/read" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn-xs btn-secondary">Mark read</button>
+          </form>
+        {% endif %}
+      </div>
+      <p class="notif-body">{{ n.body }}</p>
+      {% if n.request_id %}
+        <a href="/ui/requests/{{ n.request_id }}" class="notif-link">View request →</a>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

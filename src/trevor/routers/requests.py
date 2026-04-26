@@ -222,6 +222,7 @@ async def submit_request(
 
         pool: ArqRedis = await create_pool(ArqRedisSettings.from_dsn(settings.redis_url))
         await pool.enqueue_job("agent_review_job", str(req.id))
+        await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
         await pool.aclose()
 
     return req

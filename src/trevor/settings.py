@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     crd_namespace: str = "trevor-dev"
     crd_sync_enabled: bool = False  # disabled in tests; enabled in Tilt via env
 
+    # Notifications
+    notifications_enabled: bool = True
+
 
 def get_settings() -> Settings:
     return Settings()

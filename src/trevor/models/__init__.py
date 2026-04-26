@@ -1,5 +1,6 @@
 """trevor domain models."""
 
+from trevor.models.notification import Notification, NotificationEventType
 from trevor.models.project import Project, ProjectMembership, ProjectRole, ProjectStatus
 from trevor.models.release import DeliveryRecord, ReleaseRecord
 from trevor.models.request import (
@@ -21,6 +22,8 @@ __all__ = [
     "AirlockRequest",
     "AirlockRequestStatus",
     "AuditEvent",
+    "Notification",
+    "NotificationEventType",
     "OutputObject",
     "OutputObjectMetadata",
     "OutputObjectState",

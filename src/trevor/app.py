@@ -23,6 +23,7 @@ from trevor.routers import (
     auth_routes,
     deliveries,
     memberships,
+    notifications,
     projects,
     releases,
     requests,
@@ -81,7 +82,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         import trevor.models  # noqa: F401
 
         await create_db_and_tables(engine)
+
+    # ARQ pool for enqueueing background jobs (notifications, etc.)
+    if settings.notifications_enabled:
+        try:
+            from arq import create_pool
+            from arq.connections import RedisSettings as ArqRedisSettings
+
+            app.state.arq_pool = await create_pool(ArqRedisSettings.from_dsn(settings.redis_url))
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Failed to connect to Redis; notification enqueue disabled"
+            )
+            app.state.arq_pool = None
+    else:
+        app.state.arq_pool = None
+
     yield
+
+    if getattr(app.state, "arq_pool", None) is not None:
+        await app.state.arq_pool.aclose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -151,6 +173,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(reviews.router)
     app.include_router(releases.router)
     app.include_router(deliveries.router)
+    app.include_router(notifications.router)
     app.include_router(admin.router)
     app.include_router(ui.router)
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

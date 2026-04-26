@@ -13,6 +13,21 @@
   </div>
   <span class="spacer"></span>
   <span class="user-info">
+    <span
+      id="notif-badge-wrap"
+      data-on-load="$$get('/notifications/unread-count')"
+      data-on-interval__1000ms="$$get('/notifications/unread-count')"
+    >
+      <a href="/ui/notifications" class="notif-bell" aria-label="Notifications">
+        🔔
+        <span
+          id="notif-count"
+          class="notif-badge"
+          data-show="$count > 0"
+          data-text="$count"
+        ></span>
+      </a>
+    </span>
     {{ user.display_name }}
     {% if is_admin %}<span class="badge badge-APPROVED">admin</span>{% endif %}
     <a href="/auth/logout" class="logout-link">Log out</a>
