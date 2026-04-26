@@ -11,6 +11,7 @@ dependencies = [
     "sqlmodel>=0.0.38",
     "alembic>=1.13",
     "aiosqlite>=0.22.1",
+    "asyncpg>=0.30.0",
     "aioboto3>=15.5.0",
     "arq>=0.27.0",
     "python-jose[cryptography]>=3.5.0",
