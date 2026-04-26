@@ -106,8 +106,8 @@ All endpoints require authentication unless noted. In dev mode (`DEV_AUTH_BYPASS
 | `request.approved` | Submitter | Request approved by checkers |
 | `request.rejected` | Submitter | Request rejected by checkers |
 | `request.released` | Submitter | Release job completes |
-| `presigned_url.expiring_soon` | Submitter | Download link near expiry (planned) |
-| `request.stuck` | Admins | Request exceeds SLA threshold (planned) |
+| `presigned_url.expiring_soon` | Submitter | Download link near expiry |
+| `request.stuck` | Admins | Request exceeds SLA threshold |
 
 ## Audit
 

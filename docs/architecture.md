@@ -81,7 +81,7 @@ On every authenticated request, `upsert_user()` creates or updates a User shadow
 `notification_service.py` implements a backend-agnostic notification dispatch pipeline:
 
 - **`NotificationEvent`** — immutable dataclass carrying event type, title, body, request ID, and resolved recipient user IDs
-- **`NotificationBackend`** protocol — `InAppBackend` writes `Notification` rows to the DB; future backends (SMTP, webhook) implement the same protocol
+- **`NotificationBackend`** protocol — `InAppBackend` writes `Notification` rows to the DB; `SmtpBackend` sends email via `aiosmtplib` (enabled by `EMAIL_NOTIFICATIONS_ENABLED`); further backends implement the same protocol
 - **`NotificationRouter`** — fans out to all registered backends with per-backend error isolation
 - **`send_notifications_job`** — ARQ background job that resolves recipients, builds the event, and dispatches; fired by `agent_review_job`, `release_job`, and the submit endpoint
 
@@ -130,7 +130,8 @@ src/trevor/
     audit_service.py       # emit() helper
     release_service.py     # RO-Crate assembly, zip building
     metrics_service.py     # admin dashboard queries, pipeline metrics
-    notification_service.py  # NotificationEvent, InAppBackend, NotificationRouter, get_router
+    notification_service.py  # NotificationEvent, InAppBackend, SmtpBackend, NotificationRouter, get_router
+    email_templates/         # 7 event dirs (subject.txt, body.html, body.txt) for SmtpBackend
     crd_sync_service.py    # CRD reconcile logic (projects, users, researcher memberships)
   routers/
     users.py               # /users/me
@@ -146,7 +147,7 @@ src/trevor/
   static/                  # CSS (no JS build step)
 tests/
   conftest.py              # fixtures: in-memory SQLite, clients, sample data
-  test_*.py                # 195 tests across 14 test files
+  test_*.py                # 220 tests across 15 test files
 alembic/                   # async Alembic config + migrations
 docs/                      # this documentation (zensical)
 helm/trevor/               # Helm chart skeleton
@@ -175,5 +176,13 @@ deploy/dev/
 | `AGENT_API_KEY` | LLM API key | — |
 | `AGENT_LLM_ENABLED` | Enable LLM calls | `false` |
 | `NOTIFICATIONS_ENABLED` | Enable in-app notifications | `true` |
+| `EMAIL_NOTIFICATIONS_ENABLED` | Enable SMTP email backend | `false` |
+| `SMTP_HOST` | SMTP server hostname | `localhost` |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_FROM_ADDRESS` | Envelope From address | `trevor@karectl.example` |
+| `SMTP_USE_TLS` | STARTTLS on connect | `true` |
+| `SMTP_USERNAME` | SMTP auth username | `""` |
+| `SMTP_PASSWORD` | SMTP auth password | `""` |
+| `TREVOR_BASE_URL` | Base URL used in email links | `http://localhost:8000` |
 | `STUCK_REQUEST_HOURS` | SLA threshold | `72` |
 | `PRESIGNED_URL_TTL` | Release URL TTL (seconds) | `604800` (7 days) |

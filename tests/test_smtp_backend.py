@@ -29,7 +29,7 @@ EVENT_TYPES = [
     "request.approved",
     "request.rejected",
     "request.released",
-    "presigned_url.expiring",
+    "presigned_url.expiring_soon",
 ]
 
 BASE_CTX = {
@@ -58,7 +58,7 @@ EXTRA_CTX: dict[str, dict] = {
         "expiry_hours": 168,
         "object_count": 2,
     },
-    "presigned_url.expiring": {
+    "presigned_url.expiring_soon": {
         "presigned_url": "https://s3.example.com/output.zip?sig=abc",
         "hours_remaining": 24,
     },
