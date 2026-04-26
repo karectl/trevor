@@ -18,11 +18,15 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # ── final image ─────────────────────────────────────────────────────────────
 FROM base AS final
-COPY --from=deps /usr/local/lib/python3.13 /usr/local/lib/python3.13
-COPY --from=deps /usr/local/bin /usr/local/bin
-COPY pyproject.toml uv.lock README.md ./
+COPY --from=deps /app/.venv /app/.venv
+COPY pyproject.toml uv.lock README.md alembic.ini ./
 COPY src/ ./src/
+COPY alembic/ ./alembic/
 RUN uv sync --frozen --no-dev --no-editable
+
+# .venv/bin on PATH so trevor, alembic, arq are directly callable
+# (avoids `uv run` which re-syncs at runtime and fails as non-root)
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Non-root user (C-07 / K8s best practice)
 RUN useradd --uid 1000 --no-create-home trevor

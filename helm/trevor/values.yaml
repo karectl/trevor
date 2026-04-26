@@ -72,7 +72,7 @@ envFromSecrets: []
 worker:
   enabled: true
   replicaCount: 1  # prod: scale horizontally for throughput; each worker is safe to run in parallel
-  command: ["uv", "run", "arq", "trevor.worker.WorkerSettings"]
+  command: ["arq", "trevor.worker.WorkerSettings"]
   resources:
     requests:
       cpu: "250m"
