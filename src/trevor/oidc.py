@@ -92,6 +92,7 @@ def validate_id_token(
     jwks: dict,
     issuer: str,
     audience: str,
+    access_token: str | None = None,
 ) -> dict:
     """Validate and decode an ID/access token. Returns claims dict.
 
@@ -107,6 +108,7 @@ def validate_id_token(
             algorithms=["RS256"],
             audience=audience,
             issuer=issuer,
+            access_token=access_token,
         )
     except Exception as e:
         raise ValueError(f"Invalid token: {e}") from e
