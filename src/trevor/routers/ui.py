@@ -126,12 +126,23 @@ async def request_list(
         req_rows.append({"req": req, "object_count": len(list(obj_result.all()))})
 
     ctx = _base_ctx(request, auth)
+
+    # Only show "New Request" if user has at least one researcher membership
+    researcher_memberships = await session.exec(
+        select(ProjectMembership).where(
+            ProjectMembership.user_id == auth.user.id,
+            ProjectMembership.role == ProjectRole.RESEARCHER,
+        )
+    )
+    can_create_request = len(list(researcher_memberships.all())) > 0
+
     ctx.update(
         requests=req_rows,
         projects=projects,
         statuses=[s.value for s in AirlockRequestStatus],
         status_filter=status or "",
         project_id=project_id or "",
+        can_create_request=can_create_request,
     )
     return templates.TemplateResponse("researcher/request_list.html", ctx)
 
@@ -579,6 +590,12 @@ async def request_submit(
         request_id=req.id,
     )
     await session.commit()
+
+    pool = getattr(request.app.state, "arq_pool", None)
+    if pool is not None:
+        await pool.enqueue_job("agent_review_job", str(req.id))
+        await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
+
     return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
 
 
@@ -608,6 +625,12 @@ async def request_resubmit(
         request_id=req.id,
     )
     await session.commit()
+
+    pool = getattr(request.app.state, "arq_pool", None)
+    if pool is not None:
+        await pool.enqueue_job("agent_review_job", str(req.id))
+        await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
+
     return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
 
 

@@ -6,7 +6,9 @@
     <h1>My Requests</h1>
     <p>Airlock requests across your projects</p>
   </div>
+  {% if can_create_request %}
   <a href="/ui/requests/new" class="btn btn-primary">New Request</a>
+  {% endif %}
 </div>
 
 <div class="filter-bar">
