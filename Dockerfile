@@ -22,7 +22,7 @@ COPY --from=deps /app/.venv /app/.venv
 COPY pyproject.toml uv.lock README.md alembic.ini ./
 COPY src/ ./src/
 COPY alembic/ ./alembic/
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-dev
 
 # .venv/bin on PATH so trevor, alembic, arq are directly callable
 # (avoids `uv run` which re-syncs at runtime and fails as non-root)

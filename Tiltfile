@@ -44,7 +44,7 @@ k8s_yaml(
             "image.tag=latest",
             "replicaCount=1",
             "worker.replicaCount=1",
-            "env.DEV_AUTH_BYPASS=false",
+            "env.DEV_AUTH_BYPASS=true",
             "env.LOG_LEVEL=DEBUG",
             "env.LOG_FORMAT=console",
             "env.DATABASE_URL=postgresql+asyncpg://trevor:trevor@postgres:5432/trevor",
