@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Admin
     stuck_request_hours: int = 72
 
+    # Session
+    session_cookie_name: str = "trevor_session"
+    session_ttl_seconds: int = 3600  # 1 hour
+
     # App
     app_title: str = "trevor"
     app_version: str = "0.1.0"

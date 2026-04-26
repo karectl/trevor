@@ -15,5 +15,6 @@
   <span class="user-info">
     {{ user.display_name }}
     {% if is_admin %}<span class="badge badge-APPROVED">admin</span>{% endif %}
+    <a href="/auth/logout" class="logout-link">Log out</a>
   </span>
 </nav>

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -20,6 +20,7 @@ from trevor.limiter import limiter
 from trevor.logging_config import configure_logging
 from trevor.routers import (
     admin,
+    auth_routes,
     deliveries,
     memberships,
     projects,
@@ -104,6 +105,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
     # Error handlers — HTML for browser requests, JSON for API
+    @app.exception_handler(401)
+    async def unauthorized_handler(request: Request, exc: Exception) -> Response:
+        if _wants_html(request):
+            login_url = f"/auth/login?next={request.url.path}"
+            return RedirectResponse(login_url, status_code=302)
+        detail = getattr(exc, "detail", "Unauthorized")
+        return JSONResponse({"detail": detail}, status_code=401)
+
     @app.exception_handler(403)
     async def forbidden_handler(request: Request, exc: Exception) -> HTMLResponse | JSONResponse:
         if _wants_html(request):
@@ -134,6 +143,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok", "version": settings.app_version}
 
+    app.include_router(auth_routes.router)
     app.include_router(users.router)
     app.include_router(projects.router)
     app.include_router(memberships.router)

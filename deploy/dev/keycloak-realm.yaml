@@ -13,6 +13,7 @@ data:
           "clientId": "trevor",
           "enabled": true,
           "publicClient": true,
+          "standardFlowEnabled": true,
           "redirectUris": ["http://localhost:8000/*"],
           "webOrigins": ["http://localhost:8000"],
           "directAccessGrantsEnabled": true
