@@ -58,10 +58,22 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 "application/x-www-form-urlencoded" in content_type
                 or "multipart/form-data" in content_type
             ):
+                # Read the raw body and re-inject it so the route handler can
+                # also parse it.  BaseHTTPMiddleware passes request body via a
+                # streaming receive callable; consuming it here would leave the
+                # downstream handler with an empty body, causing 422 errors.
+                body_bytes = await request.body()
+
+                async def _replay_receive() -> dict:
+                    return {"type": "http.request", "body": body_bytes, "more_body": False}
+
+                request = Request(request.scope, receive=_replay_receive)
                 form = await request.form()
                 token = form.get("csrf_token", "")
                 if not validate_csrf_token(self.secret_key, str(token)):
                     return Response("CSRF validation failed", status_code=403)
+                # Re-wrap with the replayed body so call_next also sees it.
+                request = Request(request.scope, receive=_replay_receive)
         return await call_next(request)
 
 

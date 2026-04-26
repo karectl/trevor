@@ -140,21 +140,49 @@ async def request_create_form(
     return templates.TemplateResponse("researcher/request_create.html", ctx)
 
 
-@router.post("/requests", response_class=HTMLResponse)
+@router.post("/requests", response_class=HTMLResponse, response_model=None)
 async def request_create(
     request: Request,
     auth: CurrentAuth,
     session: Session,
-    project_id: Annotated[str, Form()],
-    title: Annotated[str, Form()],
+    project_id: Annotated[str, Form()] = "",
+    title: Annotated[str, Form()] = "",
     direction: Annotated[str, Form()] = "egress",
     description: Annotated[str, Form()] = "",
-) -> RedirectResponse:
-    pid = uuid.UUID(project_id)
+) -> HTMLResponse | RedirectResponse:
+    projects = await _user_projects(auth.user.id, session, is_admin=auth.is_admin)
+    ctx = _base_ctx(request, auth)
+    ctx["projects"] = projects
+    ctx["form"] = {
+        "project_id": project_id,
+        "title": title,
+        "direction": direction,
+        "description": description,
+    }
+
+    # Validate
+    errors: list[str] = []
+    if not project_id:
+        errors.append("Project is required.")
+    if not title or not title.strip():
+        errors.append("Title is required.")
+    if direction not in ("egress", "ingress"):
+        errors.append("Invalid direction.")
+
+    if errors:
+        ctx["errors"] = errors
+        return templates.TemplateResponse("researcher/request_create.html", ctx, status_code=422)
+
+    try:
+        pid = uuid.UUID(project_id)
+    except ValueError:
+        ctx["errors"] = ["Invalid project."]
+        return templates.TemplateResponse("researcher/request_create.html", ctx, status_code=422)
+
     req = AirlockRequest(
         project_id=pid,
         direction=AirlockDirection(direction),
-        title=title,
+        title=title.strip(),
         description=description,
         submitted_by=auth.user.id,
     )
