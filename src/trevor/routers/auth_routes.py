@@ -44,11 +44,20 @@ async def login(
     next: str = "/ui/requests",
 ) -> RedirectResponse:
     """Redirect to Keycloak authorization endpoint with PKCE."""
-    oidc_config = await fetch_openid_config(settings.keycloak_url, settings.keycloak_realm)
+    oidc_config = await fetch_openid_config(settings.keycloak_server_url, settings.keycloak_realm)
     code_verifier, code_challenge = generate_pkce()
 
     # Encode next URL in state
     state = base64.urlsafe_b64encode(json.dumps({"next": next}).encode()).decode()
+
+    # Rewrite authorization_endpoint to use browser-facing keycloak_url.
+    # When keycloak_internal_url differs from keycloak_url the discovery doc
+    # returns the internal hostname; the browser cannot reach it.
+    auth_endpoint = oidc_config["authorization_endpoint"]
+    if settings.keycloak_internal_url and settings.keycloak_internal_url != settings.keycloak_url:
+        auth_endpoint = auth_endpoint.replace(
+            settings.keycloak_internal_url, settings.keycloak_url, 1
+        )
 
     # Build authorization URL
     params = {
@@ -60,7 +69,7 @@ async def login(
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
     }
-    authorize_url = f"{oidc_config['authorization_endpoint']}?{urllib.parse.urlencode(params)}"
+    authorize_url = f"{auth_endpoint}?{urllib.parse.urlencode(params)}"
 
     response = RedirectResponse(authorize_url, status_code=302)
 
@@ -109,7 +118,7 @@ async def callback(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="State mismatch")
 
     # Exchange code for tokens
-    oidc_config = await fetch_openid_config(settings.keycloak_url, settings.keycloak_realm)
+    oidc_config = await fetch_openid_config(settings.keycloak_server_url, settings.keycloak_realm)
     try:
         token_response = await exchange_code(
             token_endpoint=oidc_config["token_endpoint"],
@@ -189,7 +198,7 @@ async def logout(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> RedirectResponse:
     """Clear session and redirect to Keycloak logout."""
-    oidc_config = await fetch_openid_config(settings.keycloak_url, settings.keycloak_realm)
+    oidc_config = await fetch_openid_config(settings.keycloak_server_url, settings.keycloak_realm)
     end_session_endpoint = oidc_config.get("end_session_endpoint", "")
 
     post_logout_uri = str(request.base_url).rstrip("/") + "/ui/requests"

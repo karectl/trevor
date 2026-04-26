@@ -15,8 +15,18 @@ class Settings(BaseSettings):
     # Auth
     dev_auth_bypass: bool = False
     keycloak_url: str = ""
+    # Internal URL for server-side OIDC calls (JWKS, token exchange).
+    # Defaults to keycloak_url when not set. Set this to the in-cluster DNS
+    # name (e.g. http://keycloak:8080) while keycloak_url points to the
+    # browser-accessible address (e.g. http://localhost:8080).
+    keycloak_internal_url: str = ""
     keycloak_realm: str = "karectl"
     keycloak_client_id: str = "trevor"
+
+    @property
+    def keycloak_server_url(self) -> str:
+        """URL used by the server for OIDC discovery and token exchange."""
+        return self.keycloak_internal_url or self.keycloak_url
 
     # S3
     s3_endpoint_url: str = ""
