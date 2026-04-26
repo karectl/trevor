@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Review — {{ airlock_request.title }} — trevor</title>
   <link rel="stylesheet" href="/static/style.css">
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@starfederation/datastar@1.0.0-beta.11/bundles/datastar.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
 </head>
 <body>
 <div class="rv-shell" data-signals="{selected: 0}">
@@ -50,8 +50,8 @@
       {%- set ft_label = ft_labels.get(ft, ext[:3].upper() or '?') -%}
 
       <div class="rv-file-row"
-           data-class-rv-file-selected="selected.value === {{ loop.index0 }}"
-           data-on-click="selected.value = {{ loop.index0 }}">
+           data-class:rv-file-selected="$selected === {{ loop.index0 }}"
+           data-on:click="$selected = {{ loop.index0 }}">
         <span class="ft-icon ft-{{ ft }}">{{ ft_label }}</span>
         <div class="rv-file-info">
           <div class="rv-file-name">{{ obj.filename }}</div>
@@ -69,7 +69,7 @@
     {# ---- Detail panel: one per object, toggled by Datastar ---- #}
     <section class="rv-detail">
       {% for obj in objects %}
-      <div class="rv-detail-pane" data-show="selected.value === {{ loop.index0 }}">
+      <div class="rv-detail-pane" data-show="$selected === {{ loop.index0 }}">
 
         <div class="flex justify-between align-center mb-2">
           <h2 style="font-size:1.1rem;font-weight:600">{{ obj.filename }}</h2>
@@ -194,20 +194,20 @@
           </p>
           <div class="rv-btn-group">
             <button type="button" class="rv-approve-btn"
-                    data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='approved';
+                    data-on:click="document.getElementById('obj_{{ obj.id }}_decision').value='approved';
                                    this.classList.add('rv-btn-active');
                                    this.nextElementSibling.nextElementSibling.classList.remove('rv-btn-active')">
               Approve
             </button>
             <button type="button" class="rv-changes-btn"
-                    data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='changes_requested';
+                    data-on:click="document.getElementById('obj_{{ obj.id }}_decision').value='changes_requested';
                                    this.classList.add('rv-btn-active');
                                    this.previousElementSibling.classList.remove('rv-btn-active');
                                    this.nextElementSibling.classList.remove('rv-btn-active')">
               Request changes
             </button>
             <button type="button" class="rv-reject-btn"
-                    data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='rejected';
+                    data-on:click="document.getElementById('obj_{{ obj.id }}_decision').value='rejected';
                                    this.classList.add('rv-btn-active');
                                    this.previousElementSibling.previousElementSibling.classList.remove('rv-btn-active')">
               Reject

@@ -5,7 +5,7 @@
     {% if is_checker or is_admin %}
     <a href="/ui/review" class="nav-link-with-badge">
       Review Queue
-      <span data-on-load="@get('/ui/sse/review/queue-count')">
+      <span data-on:load="@get('/ui/sse/review/queue-count')">
         <span id="review-queue-count" class="badge badge-count"></span>
       </span>
     </a>
@@ -20,7 +20,7 @@
   <span class="user-info">
     <a href="/ui/notifications" class="notif-bell nav-link-with-badge" aria-label="Notifications">
       🔔
-      <span data-on-load="@get('/ui/sse/notifications/count')">
+      <span data-on:load="@get('/ui/sse/notifications/count')">
         <span id="notification-count" class="badge badge-notify"></span>
       </span>
     </a>
