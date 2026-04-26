@@ -204,3 +204,5 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 trevor.db
+.playwright-mcp/
+.pytest_cache/
