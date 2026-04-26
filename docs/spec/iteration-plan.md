@@ -189,6 +189,38 @@ Deliverables:
 
 ---
 
+## Iteration 10 — Local development environment
+
+**Goal**: Single-command local dev stack with Tilt, k3d, and all infrastructure dependencies.
+
+Deliverables:
+- Devcontainer configuration (VS Code / Codespaces / remote)
+- Bare-metal setup scripts (`scripts/dev-setup.sh`, `scripts/dev-teardown.sh`)
+- Tiltfile rewrite: trevor + PostgreSQL + Redis + SeaweedFS + Keycloak in k3d
+- Kubernetes dev manifests (`deploy/dev/`): SeaweedFS, PostgreSQL, Redis, Keycloak
+- Pre-configured Keycloak realm with test users
+- SeaweedFS replaces MinIO (ADR-0013 — licensing)
+- Developer quick-start documentation
+
+---
+
+## Iteration 11 — Production Helm chart completion
+
+**Goal**: Complete Helm chart with all Kubernetes resources for production deployment.
+
+Deliverables:
+- Service, ServiceAccount, Ingress templates
+- ARQ worker Deployment template
+- HorizontalPodAutoscaler template
+- PodDisruptionBudget template
+- Network policies (optional, gated)
+- Alembic migration Job (Helm pre-upgrade hook)
+- `envFromSecrets` wired into API and worker containers
+- Startup probes, init container migration option
+- NOTES.txt post-install message
+
+---
+
 ## Later / backlog
 
 - Per-user notification preference settings
