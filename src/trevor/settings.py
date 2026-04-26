@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     agent_openai_base_url: str = ""
     agent_model_name: str = "gpt-4o"
     agent_api_key: str = ""
+    agent_review_enabled: bool = True  # set False to skip agent and go straight to HUMAN_REVIEW
     agent_llm_enabled: bool = False
     agent_min_cell_count: int = 10
     agent_dominance_p: int = 70

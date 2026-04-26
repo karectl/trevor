@@ -17,6 +17,7 @@
   <thead>
     <tr>
       <th>Title</th>
+      <th>Status</th>
       <th>Objects</th>
       <th>Agent Decision</th>
       <th>Updated</th>
@@ -27,10 +28,13 @@
     {% for req in requests %}
     <tr>
       <td>{{ req.title }}</td>
+      <td><span class="badge badge-{{ req.status }}">{{ req.status|replace("_", " ") }}</span></td>
       <td>{{ req.object_count|default(0) }}</td>
       <td>
         {% if req.agent_decision %}
         <span class="badge badge-{{ req.agent_decision|upper }}">{{ req.agent_decision }}</span>
+        {% elif req.status.value in ("SUBMITTED", "AGENT_REVIEW") %}
+        <span class="badge badge-agent-pending">Pending</span>
         {% else %}-{% endif %}
       </td>
       <td class="text-muted text-sm">{{ req.updated_at.strftime('%Y-%m-%d %H:%M') if req.updated_at else '-' }}</td>

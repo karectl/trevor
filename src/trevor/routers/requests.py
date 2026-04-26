@@ -195,6 +195,11 @@ async def submit_request(
     req.status = AirlockRequestStatus.SUBMITTED
     req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
     req.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    # If agent review is disabled, skip straight to HUMAN_REVIEW
+    if not settings.agent_review_enabled:
+        req.status = AirlockRequestStatus.HUMAN_REVIEW
+
     session.add(req)
     await audit_service.emit(
         session,
@@ -209,21 +214,22 @@ async def submit_request(
 
     requests_submitted_total.labels(direction=req.direction).inc()
 
-    # Enqueue agent review (inline in dev mode, ARQ in prod)
-    if settings.dev_auth_bypass:
-        import logging
+    # Enqueue agent review only when enabled
+    if settings.agent_review_enabled:
+        if settings.dev_auth_bypass:
+            import logging
 
-        logging.getLogger(__name__).info(
-            "Dev mode: skipping ARQ enqueue for agent_review_job (request %s)", req.id
-        )
-    else:
-        from arq.connections import ArqRedis, create_pool
-        from arq.connections import RedisSettings as ArqRedisSettings
+            logging.getLogger(__name__).info(
+                "Dev mode: skipping ARQ enqueue for agent_review_job (request %s)", req.id
+            )
+        else:
+            from arq.connections import ArqRedis, create_pool
+            from arq.connections import RedisSettings as ArqRedisSettings
 
-        pool: ArqRedis = await create_pool(ArqRedisSettings.from_dsn(settings.redis_url))
-        await pool.enqueue_job("agent_review_job", str(req.id))
-        await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
-        await pool.aclose()
+            pool: ArqRedis = await create_pool(ArqRedisSettings.from_dsn(settings.redis_url))
+            await pool.enqueue_job("agent_review_job", str(req.id))
+            await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
+            await pool.aclose()
 
     return req
 

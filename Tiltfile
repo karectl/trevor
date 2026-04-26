@@ -90,6 +90,7 @@ k8s_yaml(
             "env.SECRET_KEY=tilt-dev-secret-key",
             "env.CRD_SYNC_ENABLED=true",
             "env.CRD_NAMESPACE=trevor-dev",
+            "env.AGENT_REVIEW_ENABLED=false",
             "migrations.enabled=true",
             "migrations.hookEnabled=false",
         ],

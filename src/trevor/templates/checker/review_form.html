@@ -17,6 +17,9 @@
       <span class="rv-brand">trevor</span>
       <span class="rv-title">{{ airlock_request.title }}</span>
       <span class="badge badge-{{ airlock_request.status }}">{{ airlock_request.status|replace("_", " ") }}</span>
+      {% if agent_review_pending %}
+      <span class="badge badge-agent-pending">Agent review pending</span>
+      {% endif %}
     </div>
     <div class="rv-header-right">
       <span class="rv-progress text-sm text-muted">
@@ -240,6 +243,11 @@
 
   {# ---- Bottom bar with submit ---- #}
   <footer class="rv-footer">
+    {% if agent_review_pending %}
+    <div class="rv-footer-pending">
+      Agent review is in progress. You can read the request but cannot submit your review until it completes.
+    </div>
+    {% else %}
     <form id="review-form" method="post" action="/ui/review/{{ airlock_request.id }}" class="rv-footer-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       {% for obj in objects %}
@@ -263,6 +271,7 @@
         <button type="submit" class="btn btn-primary">Submit Review</button>
       </div>
     </form>
+    {% endif %}
   </footer>
 
 </div>{# rv-shell #}

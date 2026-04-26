@@ -338,6 +338,10 @@ textarea { resize: vertical; min-height: 80px; }
   border-radius: var(--radius); font-size: .85rem; font-family: var(--font);
 }
 .rv-footer-right { flex-shrink: 0; }
+.rv-footer-pending {
+  font-size: .9rem; color: var(--text-muted); font-style: italic; padding: 4px 0;
+}
+.badge-agent-pending { background: #f59e0b; color: #fff; }
 
 /* Notifications */
 .notif-bell { position: relative; text-decoration: none; font-size: 1.1rem; margin-right: .5rem; }

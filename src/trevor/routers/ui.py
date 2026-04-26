@@ -582,6 +582,8 @@ async def request_submit(
     req.status = AirlockRequestStatus.SUBMITTED
     req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
     req.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    if not settings.agent_review_enabled:
+        req.status = AirlockRequestStatus.HUMAN_REVIEW
     session.add(req)
     await audit_service.emit(
         session,
@@ -591,10 +593,11 @@ async def request_submit(
     )
     await session.commit()
 
-    pool = getattr(request.app.state, "arq_pool", None)
-    if pool is not None:
-        await pool.enqueue_job("agent_review_job", str(req.id))
-        await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
+    if settings.agent_review_enabled:
+        pool = getattr(request.app.state, "arq_pool", None)
+        if pool is not None:
+            await pool.enqueue_job("agent_review_job", str(req.id))
+            await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
 
     return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
 
@@ -617,6 +620,8 @@ async def request_resubmit(
     req.status = AirlockRequestStatus.SUBMITTED
     req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
     req.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    if not settings.agent_review_enabled:
+        req.status = AirlockRequestStatus.HUMAN_REVIEW
     session.add(req)
     await audit_service.emit(
         session,
@@ -626,10 +631,13 @@ async def request_resubmit(
     )
     await session.commit()
 
-    pool = getattr(request.app.state, "arq_pool", None)
-    if pool is not None:
-        await pool.enqueue_job("agent_review_job", str(req.id))
-        await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
+    if settings.agent_review_enabled:
+        pool = getattr(request.app.state, "arq_pool", None)
+        if pool is not None:
+            await pool.enqueue_job("agent_review_job", str(req.id))
+            await pool.enqueue_job("send_notifications_job", "request.submitted", str(req.id))
+
+    return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
 
     return RedirectResponse(f"/ui/requests/{request_id}", status_code=303)
 
@@ -705,15 +713,20 @@ async def review_project_list(
 
     pids = await _checker_project_ids(auth.user.id, session, is_admin=auth.is_admin)
     projects_info: list[dict] = []
+    _CHECKER_STATUSES = (
+        AirlockRequestStatus.SUBMITTED,
+        AirlockRequestStatus.AGENT_REVIEW,
+        AirlockRequestStatus.HUMAN_REVIEW,
+    )
     for pid in pids:
         project = await session.get(Project, pid)
         if not project:
             continue
-        # Count pending HUMAN_REVIEW requests
+        # Count requests awaiting checker attention (includes agent-pending)
         count_result = await session.exec(
             select(func.count(AirlockRequest.id)).where(
                 AirlockRequest.project_id == pid,
-                AirlockRequest.status == AirlockRequestStatus.HUMAN_REVIEW,
+                AirlockRequest.status.in_(_CHECKER_STATUSES),
             )
         )
         pending_count = count_result.one()
@@ -722,7 +735,7 @@ async def review_project_list(
             select(AirlockRequest.updated_at)
             .where(
                 AirlockRequest.project_id == pid,
-                AirlockRequest.status == AirlockRequestStatus.HUMAN_REVIEW,
+                AirlockRequest.status.in_(_CHECKER_STATUSES),
             )
             .order_by(AirlockRequest.updated_at)
             .limit(1)
@@ -754,11 +767,16 @@ async def review_request_list(
     if not project:
         raise HTTPException(status_code=404)
 
+    _CHECKER_STATUSES = (
+        AirlockRequestStatus.SUBMITTED,
+        AirlockRequestStatus.AGENT_REVIEW,
+        AirlockRequestStatus.HUMAN_REVIEW,
+    )
     query = (
         select(AirlockRequest)
         .where(
             AirlockRequest.project_id == project_id,
-            AirlockRequest.status == AirlockRequestStatus.HUMAN_REVIEW,
+            AirlockRequest.status.in_(_CHECKER_STATUSES),
         )
         .order_by(AirlockRequest.updated_at)
     )
@@ -858,6 +876,11 @@ async def review_form(
         agent_review=agent_review,
         agent_assessments=agent_assessments,
         object_previews=object_previews,
+        agent_review_pending=req.status
+        in (
+            AirlockRequestStatus.SUBMITTED,
+            AirlockRequestStatus.AGENT_REVIEW,
+        ),
     )
     return templates.TemplateResponse("checker/review_form.html", ctx)
 
@@ -874,6 +897,8 @@ async def review_submit(
     req = await session.get(AirlockRequest, request_id)
     if not req:
         raise HTTPException(status_code=404)
+    if req.status != AirlockRequestStatus.HUMAN_REVIEW:
+        raise HTTPException(status_code=409, detail="Request is not yet ready for human review")
 
     # Parse per-object decisions from form
     form_data = await request.form()
