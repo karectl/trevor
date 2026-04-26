@@ -266,11 +266,11 @@ Deliverables:
 **Goal**: Automatically sync CR8TOR Project, User, and Group CRDs into trevor's database.
 
 Spec: `spec/iterations/iteration-13-spec.md`  
-ADRs: ADR-0012 (CRD sync design), ADR-0014 (kr8s client)
+ADRs: ADR-0012 (CRD sync design), ADR-0016 (official kubernetes client, supersedes ADR-0014)
 
 Deliverables:
-- `kr8s` dependency for async Kubernetes API access
-- CRD client module (`crd.py`) — custom resource classes for Project, Group, User CRDs
+- `kubernetes>=31.0` dependency (official Python client)
+- CRD client module (`crd.py`) — `CustomObjectsApi` list functions wrapped for async via `run_in_executor`
 - Sync service (`crd_sync_service.py`) — parse CRDs, reconcile projects/users/memberships
 - ARQ cron job running every 5 minutes
 - RBAC manifest (ClusterRole + ClusterRoleBinding)

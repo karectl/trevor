@@ -1,6 +1,6 @@
 # ADR-0014 — CRD Sync: `kr8s` Async Kubernetes Client
 
-**Status**: Accepted  
+**Status**: Superseded by ADR-0016  
 **Date**: 2026-04  
 **Deciders**: trevor project lead  
 **Supersedes**: None  

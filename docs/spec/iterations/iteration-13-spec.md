@@ -14,7 +14,7 @@ Implement the CR8TOR CRD sync reconciler prescribed by ADR-0012. trevor automati
 | `upsert_user` service | Implemented |
 | Sample CRDs in `deploy/dev/crds/` + `deploy/dev/sample-project/` | Deployed via Tiltfile |
 | CRD sync service | Missing |
-| `kr8s` dependency | Not installed |
+| `kubernetes` client dependency | Not installed |
 | ARQ cron job for periodic reconcile | Not wired |
 | RBAC (ClusterRole/ClusterRoleBinding) | Not created |
 
@@ -24,7 +24,7 @@ Implement the CR8TOR CRD sync reconciler prescribed by ADR-0012. trevor automati
 
 | Item | Decision |
 |---|---|
-| K8s client | `kr8s` (ADR-0014) |
+| K8s client | `kubernetes` official Python client (ADR-0016 supersedes ADR-0014) |
 | Sync mode | Periodic reconcile only (v1). Watch can be added later. |
 | Frequency | ARQ cron every 5 minutes |
 | Researcher memberships | Derived from Group CRDs per ADR-0012 |
@@ -40,15 +40,17 @@ Watch mode is deferred because:
 
 ## 1. Dependency
 
-### Add `kr8s` to `pyproject.toml`
+### Add `kubernetes` to `pyproject.toml`
 
 ```toml
 [project]
 dependencies = [
     ...,
-    "kr8s>=0.18",
+    "kubernetes>=31.0",
 ]
 ```
+
+The official `kubernetes` client ships a synchronous API by default, but also provides an `async_req` parameter and an `asyncio` compatibility layer. For ARQ jobs (which run in a thread pool), synchronous calls are acceptable. All Kubernetes API calls in `crd.py` use the sync client wrapped with `asyncio.get_event_loop().run_in_executor` to avoid blocking the event loop.
 
 ---
 
@@ -56,49 +58,65 @@ dependencies = [
 
 ### File: `src/trevor/crd.py`
 
-Defines custom resource classes and provides typed access to CRD data.
+Provides typed access to CRD data using the official Kubernetes Python client's `CustomObjectsApi`.
 
 ```python
-"""CR8TOR CRD client — custom resource definitions via kr8s."""
+"""CR8TOR CRD client — custom resource access via official kubernetes client."""
 
 from __future__ import annotations
 
-import kr8s
-from kr8s.asyncio import get as kr8s_get
+import asyncio
+from functools import partial
 
-# Custom resource class definitions
-ProjectCR = kr8s.objects.new_class(
-    kind="Project",
-    api_version="research.karectl.io/v1alpha1",
-    namespaced=True,
-)
-
-GroupCR = kr8s.objects.new_class(
-    kind="Group",
-    api_version="identity.karectl.io/v1alpha1",
-    namespaced=True,
-)
-
-UserCR = kr8s.objects.new_class(
-    kind="User",
-    api_version="identity.karectl.io/v1alpha1",
-    namespaced=True,
-)
+from kubernetes import client, config
 
 
-async def list_project_crds(namespace: str) -> list:
+def _load_k8s_config() -> None:
+    """Load in-cluster config, falling back to kubeconfig for local dev."""
+    try:
+        config.load_incluster_config()
+    except config.ConfigException:
+        config.load_kube_config()
+
+
+def _list_crds_sync(group: str, version: str, plural: str, namespace: str) -> list[dict]:
+    """Synchronous CRD list call — run via executor to avoid blocking."""
+    _load_k8s_config()
+    api = client.CustomObjectsApi()
+    result = api.list_namespaced_custom_object(
+        group=group,
+        version=version,
+        namespace=namespace,
+        plural=plural,
+    )
+    return result.get("items", [])
+
+
+async def list_project_crds(namespace: str) -> list[dict]:
     """List all Project CRDs in namespace."""
-    return await kr8s_get(ProjectCR, namespace=namespace)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        partial(_list_crds_sync, "research.karectl.io", "v1alpha1", "projects", namespace),
+    )
 
 
-async def list_group_crds(namespace: str) -> list:
+async def list_group_crds(namespace: str) -> list[dict]:
     """List all Group CRDs in namespace."""
-    return await kr8s_get(GroupCR, namespace=namespace)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        partial(_list_crds_sync, "identity.karectl.io", "v1alpha1", "groups", namespace),
+    )
 
 
-async def list_user_crds(namespace: str) -> list:
+async def list_user_crds(namespace: str) -> list[dict]:
     """List all User CRDs in namespace."""
-    return await kr8s_get(UserCR, namespace=namespace)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        partial(_list_crds_sync, "identity.karectl.io", "v1alpha1", "users", namespace),
+    )
 ```
 
 ---
@@ -107,7 +125,7 @@ async def list_user_crds(namespace: str) -> list:
 
 ### File: `src/trevor/services/crd_sync_service.py`
 
-Pure business logic — takes parsed CRD data dicts, performs DB operations. No direct `kr8s` dependency (testable without K8s).
+Pure business logic — takes parsed CRD data dicts, performs DB operations. No direct `kubernetes` client dependency (testable without K8s).
 
 #### Helper: parse CRD data
 
@@ -273,10 +291,13 @@ async def crd_sync_job(ctx: dict[str, Any]) -> None:
     session_factory = ctx["session_factory"]
     namespace = settings.crd_namespace  # new setting
 
+    if not settings.crd_sync_enabled:
+        return
+
     try:
-        project_crds = [cr.raw for cr in await list_project_crds(namespace)]
-        group_crds = [cr.raw for cr in await list_group_crds(namespace)]
-        user_crds = [cr.raw for cr in await list_user_crds(namespace)]
+        project_crds = await list_project_crds(namespace)
+        group_crds = await list_group_crds(namespace)
+        user_crds = await list_user_crds(namespace)
     except Exception:
         logger.exception("crd_sync_job: failed to list CRDs")
         return
@@ -379,14 +400,14 @@ Tests use no Kubernetes cluster. They pass parsed CRD data dicts directly to the
 
 ```
 src/trevor/
-  crd.py                              # NEW — kr8s custom resource definitions + list functions
+  crd.py                              # NEW — kubernetes CustomObjectsApi + async list functions
   services/crd_sync_service.py        # NEW — parse, reconcile, full_reconcile
   worker.py                           # MODIFIED — add crd_sync_job cron
   settings.py                         # MODIFIED — crd_namespace, crd_sync_enabled
 deploy/dev/
   rbac-crd-reader.yaml                # NEW — ClusterRole + ClusterRoleBinding
 Tiltfile                              # MODIFIED — wire RBAC manifest
-pyproject.toml                        # MODIFIED — add kr8s dependency
+pyproject.toml                        # MODIFIED — add kubernetes>=31.0 dependency
 tests/
   test_crd_sync.py                    # NEW — 16+ unit tests
 ```
@@ -395,8 +416,8 @@ tests/
 
 ## Implementation order
 
-1. `pyproject.toml` — add `kr8s>=0.18` dependency, `uv sync`
-2. `src/trevor/crd.py` — custom resource classes + list functions
+1. `pyproject.toml` — add `kubernetes>=31.0` dependency, `uv sync`
+2. `src/trevor/crd.py` — `CustomObjectsApi` list functions wrapped for async
 3. `src/trevor/services/crd_sync_service.py` — parse helpers, reconcile functions, full_reconcile
 4. `src/trevor/settings.py` — add `crd_namespace`, `crd_sync_enabled`
 5. `src/trevor/worker.py` — add `crd_sync_job`, wire into cron_jobs
