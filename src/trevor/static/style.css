@@ -332,6 +332,13 @@ textarea { resize: vertical; min-height: 80px; }
 .rv-footer-label { font-size: .85rem; font-weight: 500; white-space: nowrap; }
 .rv-footer-radios { display: flex; gap: 12px; font-size: .85rem; }
 .rv-footer-radios label { display: flex; align-items: center; gap: 4px; margin-bottom: 0; font-weight: 400; }
+.rv-footer-derived { display: flex; align-items: center; }
+.rv-derived-badge { font-size: .85rem; font-weight: 600; padding: 3px 10px; border-radius: var(--radius); }
+.rv-derived-undecided { background: var(--surface-alt, #f3f4f6); color: var(--text-muted); }
+.rv-derived-approved  { background: #dcfce7; color: #15803d; }
+.rv-derived-changes   { background: #fef9c3; color: #a16207; }
+.rv-derived-rejected  { background: #fee2e2; color: #b91c1c; }
+.btn-disabled, button:disabled { opacity: .45; cursor: not-allowed; }
 .rv-footer-center { flex: 1; }
 .rv-summary-input {
   width: 100%; padding: 6px 10px; border: 1px solid var(--border);

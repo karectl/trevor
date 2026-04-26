@@ -8,7 +8,12 @@
   <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
 </head>
 <body>
-<div class="rv-shell" data-signals="{selected: 0, {% for obj in objects %}{% if obj.state.value == 'PENDING' %}dec_{{ obj.id|replace('-','_') }}: ''{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}}">
+<div class="rv-shell" data-signals="{
+  selected: 0,
+  {% for obj in objects %}{% if obj.state.value == 'PENDING' %}dec_{{ obj.id|replace('-','_') }}: '',
+  {% endif %}{% endfor %}
+  overall: ''
+}">
 
   {# Hidden per-object decision inputs synced from Datastar signals.
      form="review-form" associates them with the submit form. #}
@@ -18,6 +23,27 @@
          data-bind="dec_{{ obj.id|replace('-','_') }}">
   {% endif %}
   {% endfor %}
+
+  {# Hidden overall decision input — value derived from per-object signals #}
+  <input type="hidden" name="decision" form="review-form" data-bind="overall">
+
+  {# JS helper: derives overall decision.
+     sigId = the signal name just changed, newVal = its new value.
+     Reads current hidden inputs for all other objects (data-bind keeps them in sync). #}
+  <script>
+    function rvComputeOverall(sigId, newVal) {
+      const inputs = document.querySelectorAll('[name$="_decision"][form="review-form"]');
+      const decs = Array.from(inputs).map(i => {
+        // Use the new value for the just-clicked input, DOM value for others
+        const sig = i.getAttribute('data-bind');
+        return sig === sigId ? newVal : i.value;
+      });
+      if (decs.some(d => d === '')) return '';
+      if (decs.some(d => d === 'rejected')) return 'rejected';
+      if (decs.some(d => d === 'changes_requested')) return 'changes_requested';
+      return 'approved';
+    }
+  </script>
 
   {# ---- Header bar ---- #}
   <header class="rv-header">
@@ -208,19 +234,19 @@
             <button type="button"
                     class="rv-approve-btn"
                     data-class:rv-btn-active="$dec_{{ obj.id|replace('-','_') }} === 'approved'"
-                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'approved'">
+                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'approved'; $overall = rvComputeOverall('dec_{{ obj.id|replace('-','_') }}', 'approved')">
               Approve
             </button>
             <button type="button"
                     class="rv-changes-btn"
                     data-class:rv-btn-active="$dec_{{ obj.id|replace('-','_') }} === 'changes_requested'"
-                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'changes_requested'">
+                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'changes_requested'; $overall = rvComputeOverall('dec_{{ obj.id|replace('-','_') }}', 'changes_requested')">
               Request changes
             </button>
             <button type="button"
                     class="rv-reject-btn"
                     data-class:rv-btn-active="$dec_{{ obj.id|replace('-','_') }} === 'rejected'"
-                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'rejected'">
+                    data-on:click="$dec_{{ obj.id|replace('-','_') }} = 'rejected'; $overall = rvComputeOverall('dec_{{ obj.id|replace('-','_') }}', 'rejected')">
               Reject
             </button>
           </div>
@@ -262,17 +288,31 @@
 
       <div class="rv-footer-left">
         <label class="rv-footer-label">Overall decision:</label>
-        <div class="rv-footer-radios">
-          <label><input type="radio" name="decision" value="approved" required> Approve all</label>
-          <label><input type="radio" name="decision" value="changes_requested"> Request changes</label>
-          <label><input type="radio" name="decision" value="rejected"> Reject</label>
+        <div class="rv-footer-derived">
+          <span class="rv-derived-badge rv-derived-undecided"
+                data-show="$overall === ''"
+                >Decide all files first</span>
+          <span class="rv-derived-badge rv-derived-approved"
+                style="display:none"
+                data-show="$overall === 'approved'"
+                >Approve all</span>
+          <span class="rv-derived-badge rv-derived-changes"
+                style="display:none"
+                data-show="$overall === 'changes_requested'"
+                >Request changes</span>
+          <span class="rv-derived-badge rv-derived-rejected"
+                style="display:none"
+                data-show="$overall === 'rejected'"
+                >Reject</span>
         </div>
       </div>
       <div class="rv-footer-center">
         <input type="text" name="summary" placeholder="Overall summary (required)" class="rv-summary-input" required>
       </div>
       <div class="rv-footer-right">
-        <button type="submit" class="btn btn-primary">Submit Review</button>
+        <button type="submit" class="btn btn-primary"
+                data-attr:disabled="$overall === '' ? true : undefined"
+                data-class:btn-disabled="$overall === ''">Submit Review</button>
       </div>
     </form>
   </footer>
