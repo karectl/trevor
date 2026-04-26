@@ -55,12 +55,16 @@ async def test_admin_requests_empty(admin_client):
 async def test_admin_requests_with_data(researcher_setup, admin_client, db_session):
     client, project_id = researcher_setup
 
-    # Create a request via API
+    # Create a request and move to SUBMITTED (admins cannot see DRAFTs)
     r = await client.post(
         "/requests",
         json={"project_id": str(project_id), "direction": "egress", "title": "Admin test"},
     )
     assert r.status_code == 201
+    req = await db_session.get(AirlockRequest, uuid.UUID(r.json()["id"]))
+    req.status = AirlockRequestStatus.SUBMITTED
+    db_session.add(req)
+    await db_session.commit()
 
     r = await admin_client.get("/admin/requests")
     assert r.status_code == 200
@@ -74,8 +78,8 @@ async def test_admin_requests_with_data(researcher_setup, admin_client, db_sessi
 async def test_admin_requests_filter_by_status(researcher_setup, admin_client, db_session):
     client, project_id = researcher_setup
 
-    # Create two requests
-    await client.post(
+    # Create two requests and move both past DRAFT so admin can see them
+    r1 = await client.post(
         "/requests",
         json={"project_id": str(project_id), "direction": "egress", "title": "Draft one"},
     )
@@ -83,17 +87,20 @@ async def test_admin_requests_filter_by_status(researcher_setup, admin_client, d
         "/requests",
         json={"project_id": str(project_id), "direction": "egress", "title": "Draft two"},
     )
-    # Move second to SUBMITTED via DB
-    req = await db_session.get(AirlockRequest, uuid.UUID(r2.json()["id"]))
-    req.status = AirlockRequestStatus.SUBMITTED
-    db_session.add(req)
+    # Move first to HUMAN_REVIEW, second to SUBMITTED
+    req1 = await db_session.get(AirlockRequest, uuid.UUID(r1.json()["id"]))
+    req1.status = AirlockRequestStatus.HUMAN_REVIEW
+    db_session.add(req1)
+    req2 = await db_session.get(AirlockRequest, uuid.UUID(r2.json()["id"]))
+    req2.status = AirlockRequestStatus.SUBMITTED
+    db_session.add(req2)
     await db_session.commit()
 
-    # Filter DRAFT only
-    r = await admin_client.get("/admin/requests?status=DRAFT")
+    # Filter SUBMITTED only
+    r = await admin_client.get("/admin/requests?status=SUBMITTED")
     assert r.status_code == 200
     assert r.json()["total"] == 1
-    assert r.json()["items"][0]["status"] == "DRAFT"
+    assert r.json()["items"][0]["status"] == "SUBMITTED"
 
 
 @pytest.mark.asyncio
@@ -101,10 +108,15 @@ async def test_admin_requests_pagination(researcher_setup, admin_client, db_sess
     client, project_id = researcher_setup
 
     for i in range(3):
-        await client.post(
+        r = await client.post(
             "/requests",
             json={"project_id": str(project_id), "direction": "egress", "title": f"Req {i}"},
         )
+        # Move past DRAFT so admin can see them
+        req = await db_session.get(AirlockRequest, uuid.UUID(r.json()["id"]))
+        req.status = AirlockRequestStatus.SUBMITTED
+        db_session.add(req)
+    await db_session.commit()
 
     r = await admin_client.get("/admin/requests?limit=2&offset=0")
     assert r.json()["total"] == 3

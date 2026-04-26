@@ -11,6 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -98,6 +99,13 @@ async def request_list(
     if not auth.is_admin:
         pids = [p.id for p in projects]
         query = query.where(AirlockRequest.project_id.in_(pids)) if pids else query.where(False)
+    # DRAFT requests are only visible to their owner
+    query = query.where(
+        or_(
+            AirlockRequest.status != AirlockRequestStatus.DRAFT,
+            AirlockRequest.submitted_by == auth.user.id,
+        )
+    )
     if status:
         query = query.where(AirlockRequest.status == status)
     if project_id:
@@ -220,6 +228,12 @@ async def _build_request_detail_ctx(
     if not req:
         raise HTTPException(status_code=404)
     project = await session.get(Project, req.project_id)
+
+    # DRAFT requests are only visible to their owner
+    if req.status == AirlockRequestStatus.DRAFT and auth.user.id != req.submitted_by:
+        raise HTTPException(
+            status_code=403, detail="Draft requests are only visible to their owner"
+        )
 
     obj_result = await session.exec(
         select(OutputObject)
@@ -1344,8 +1358,6 @@ async def notification_mark_all_read(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> RedirectResponse:
     """Mark all notifications read (form POST from UI)."""
-    from sqlmodel import select
-
     from trevor.models.notification import Notification
 
     result = await session.exec(

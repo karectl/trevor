@@ -60,8 +60,8 @@ async def list_admin_requests(
     """List all requests with summary info for admin dashboard."""
     now = _now_naive()
 
-    # Base query
-    base = select(AirlockRequest)
+    # Base query — never expose DRAFT requests in admin views
+    base = select(AirlockRequest).where(AirlockRequest.status != AirlockRequestStatus.DRAFT)
     if status_filter:
         base = base.where(AirlockRequest.status.in_(status_filter))
     if project_id:
