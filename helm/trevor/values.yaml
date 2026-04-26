@@ -1,6 +1,7 @@
 # Default values for trevor.
+# Production recommendations are annotated inline.
 
-replicaCount: 1
+replicaCount: 2  # prod: 2+ for HA
 
 image:
   repository: trevor
@@ -29,48 +30,65 @@ ingress:
 
 resources:
   requests:
-    cpu: "100m"
-    memory: "128Mi"
+    cpu: "250m"
+    memory: "256Mi"
   limits:
-    cpu: "500m"
+    cpu: "1000m"
     memory: "512Mi"
 
 autoscaling:
   enabled: false
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
 
 # ── Application config ───────────────────────────────────────────────────────
 env:
   LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
   DEV_AUTH_BYPASS: "false"
+  OTEL_ENABLED: "false"
+  OTEL_SERVICE_NAME: "trevor"
+  MAX_UPLOAD_SIZE_MB: "500"
+  STUCK_REQUEST_HOURS: "72"
 
-# Override DATABASE_URL, REDIS_URL, Keycloak, S3 creds via Kubernetes Secrets.
-# Mount secret keys as env vars in your overlay values.
+# Secrets: mount these from Kubernetes Secrets (never put values here).
+# Create secrets externally and reference them below.
 envFromSecrets: []
 # - secretName: trevor-db
 #   keys: [DATABASE_URL]
+# - secretName: trevor-redis
+#   keys: [REDIS_URL]
+# - secretName: trevor-keycloak
+#   keys: [KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID]
 # - secretName: trevor-s3
-#   keys: [S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY]
+#   keys: [S3_ENDPOINT_URL, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_QUARANTINE_BUCKET, S3_RELEASE_BUCKET]
+# - secretName: trevor-app
+#   keys: [SECRET_KEY]
+# - secretName: trevor-agent
+#   keys: [AGENT_OPENAI_BASE_URL, AGENT_MODEL_NAME, AGENT_API_KEY]
 
 # ── ARQ worker ────────────────────────────────────────────────────────────────
 worker:
   enabled: true
-  replicaCount: 1
+  replicaCount: 1  # prod: scale horizontally for throughput; each worker is safe to run in parallel
   command: ["uv", "run", "arq", "trevor.worker.WorkerSettings"]
   resources:
     requests:
-      cpu: "100m"
-      memory: "128Mi"
+      cpu: "250m"
+      memory: "256Mi"
     limits:
-      cpu: "500m"
+      cpu: "1000m"
       memory: "512Mi"
+
+# ── OpenTelemetry collector ───────────────────────────────────────────────────
+# Set OTEL_ENABLED=true and OTEL_EXPORTER_OTLP_ENDPOINT in env when deploying
+# an OTel collector (e.g. opentelemetry-collector sub-chart or Grafana Alloy).
 
 # ── Redis (sub-chart placeholder) ─────────────────────────────────────────────
 redis:
-  enabled: false  # use an external Redis in prod; enable for local testing
+  enabled: false  # use an external Redis in prod; enable for local testing only
 
 # ── PostgreSQL (sub-chart placeholder) ────────────────────────────────────────
 postgresql:
-  enabled: false  # use an external PG in prod; enable for local testing
+  enabled: false  # use an external PG in prod; enable for local testing only
