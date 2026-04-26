@@ -23,7 +23,7 @@
 
 {# Top action bar #}
 <div class="ws-actions mb-2">
-  {% if airlock_request.status.value == "DRAFT" %}
+  {% if is_owner and airlock_request.status.value == "DRAFT" %}
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/submit">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary"
@@ -31,7 +31,7 @@
       Submit for Review
     </button>
   </form>
-  {% elif airlock_request.status.value == "CHANGES_REQUESTED" %}
+  {% elif is_owner and airlock_request.status.value == "CHANGES_REQUESTED" %}
   <form method="post" action="/ui/requests/{{ airlock_request.id }}/resubmit">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit" class="btn btn-primary">Resubmit</button>
@@ -110,8 +110,8 @@
           {% endif %}
         </div>
 
-        {# Add object button — only in DRAFT #}
-        {% if airlock_request.status.value == "DRAFT" %}
+        {# Add object button — only in DRAFT for owner #}
+        {% if is_owner and airlock_request.status.value == "DRAFT" %}
         <div class="ws-nav-add">
           <button type="button" class="btn btn-sm" style="width:100%"
                   data-on:click="$showUpload = !$showUpload; $showMeta = -1">
@@ -210,7 +210,7 @@
               <h2 class="ws-pane-title" style="margin-bottom:0">{{ obj.filename }}</h2>
               <div class="flex align-center gap-1">
                 <span class="badge badge-{{ obj.state }}">{{ obj.state|replace('_',' ') }}</span>
-                {% if airlock_request.status.value == "DRAFT" %}
+                {% if is_owner and airlock_request.status.value == "DRAFT" %}
                 <button type="button" class="btn btn-sm" title="Edit metadata"
                         data-on:click="$showMeta = $showMeta === {{ loop.index0 }} ? -1 : {{ loop.index0 }}">
                   Edit metadata
@@ -254,8 +254,8 @@
             </div>
             {% endif %}
 
-            {# Replace button (CHANGES_REQUESTED) #}
-            {% if obj.state.value in ("CHANGES_REQUESTED", "REJECTED") and airlock_request.status.value == "CHANGES_REQUESTED" %}
+            {# Replace button (CHANGES_REQUESTED) — owner only #}
+            {% if is_owner and obj.state.value in ("CHANGES_REQUESTED", "REJECTED") and airlock_request.status.value == "CHANGES_REQUESTED" %}
             <div class="mb-2">
               <a href="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/replace"
                  class="btn btn-sm">Replace file</a>

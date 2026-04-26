@@ -247,6 +247,8 @@ async def _build_request_detail_ctx(
     )
     audit_events = list(audit_result.all())
 
+    is_owner = auth.user.id == req.submitted_by
+
     return {
         **_base_ctx(request, auth),
         "request": request,
@@ -257,6 +259,7 @@ async def _build_request_detail_ctx(
         "reviews": reviews,
         "audit_events": audit_events,
         "settings": get_settings(),
+        "is_owner": is_owner,
     }
 
 
@@ -295,6 +298,8 @@ async def object_upload(
     req = await session.get(AirlockRequest, request_id)
     if not req or req.status != AirlockRequestStatus.DRAFT:
         raise HTTPException(status_code=409, detail="Request not in DRAFT state")
+    if auth.user.id != req.submitted_by:
+        raise HTTPException(status_code=403, detail="Only the request owner can upload objects")
 
     raw = await file.read()
     checksum = hashlib.sha256(raw).hexdigest()
@@ -388,6 +393,11 @@ async def object_metadata_save(
     obj = await session.get(OutputObject, object_id)
     if not obj or obj.request_id != request_id:
         raise HTTPException(status_code=404)
+    req = await session.get(AirlockRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404)
+    if auth.user.id != req.submitted_by:
+        raise HTTPException(status_code=403, detail="Only the request owner can edit metadata")
     meta = await session.get(OutputObjectMetadata, obj.logical_object_id)
     if not meta:
         meta = OutputObjectMetadata(logical_object_id=obj.logical_object_id)
@@ -440,6 +450,8 @@ async def object_replace(
     req = await session.get(AirlockRequest, request_id)
     if not req or req.status != AirlockRequestStatus.CHANGES_REQUESTED:
         raise HTTPException(status_code=409)
+    if auth.user.id != req.submitted_by:
+        raise HTTPException(status_code=403, detail="Only the request owner can replace objects")
     original = await session.get(OutputObject, object_id)
     if not original or original.request_id != request_id:
         raise HTTPException(status_code=404)
@@ -497,6 +509,8 @@ async def object_delete(
     req = await session.get(AirlockRequest, request_id)
     if not req or req.status != AirlockRequestStatus.DRAFT:
         raise HTTPException(status_code=409, detail="Request not in DRAFT state")
+    if auth.user.id != req.submitted_by:
+        raise HTTPException(status_code=403, detail="Only the request owner can delete objects")
     obj = await session.get(OutputObject, object_id)
     if not obj or obj.request_id != request_id:
         raise HTTPException(status_code=404)
@@ -538,6 +552,8 @@ async def request_submit(
     req = await session.get(AirlockRequest, request_id)
     if not req or req.status != AirlockRequestStatus.DRAFT:
         raise HTTPException(status_code=409)
+    if auth.user.id != req.submitted_by:
+        raise HTTPException(status_code=403, detail="Only the request owner can submit")
     req.status = AirlockRequestStatus.SUBMITTED
     req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
     req.updated_at = datetime.now(UTC).replace(tzinfo=None)
@@ -565,6 +581,8 @@ async def request_resubmit(
     req = await session.get(AirlockRequest, request_id)
     if not req or req.status != AirlockRequestStatus.CHANGES_REQUESTED:
         raise HTTPException(status_code=409)
+    if auth.user.id != req.submitted_by:
+        raise HTTPException(status_code=403, detail="Only the request owner can resubmit")
     req.status = AirlockRequestStatus.SUBMITTED
     req.submitted_at = datetime.now(UTC).replace(tzinfo=None)
     req.updated_at = datetime.now(UTC).replace(tzinfo=None)
