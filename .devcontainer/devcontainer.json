@@ -9,8 +9,14 @@
       "minikube": "none",
       "helm": "latest",
       "kubectl": "latest"
-    }
+    },
+    "ghcr.io/devcontainers/features/node:1": {}
   },
+  "mounts": [
+    "type=bind,source=${localEnv:HOME}/.config/opencode,target=/home/vscode/.config/opencode,consistency=cached",
+    "type=bind,source=${localEnv:HOME}/.local/share/opencode,target=/home/vscode/.local/share/opencode,consistency=cached"
+  ],
+  "initializeCommand": "mkdir -p ${localEnv:HOME}/.config/opencode ${localEnv:HOME}/.local/share/opencode",
   "postCreateCommand": ".devcontainer/post-create.sh",
   "forwardPorts": [8000, 8080, 8333, 5432, 6379],
   "customizations": {
