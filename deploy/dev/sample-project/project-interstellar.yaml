@@ -1,0 +1,12 @@
+apiVersion: research.karectl.io/v1alpha1
+kind: Project
+metadata:
+  name: interstellar
+  namespace: trevor-dev
+  labels:
+    app.kubernetes.io/managed-by: tilt
+    cr8tor.io/created-at: "20260426"
+    cr8tor.io/project-id: a1b2c3d4-0001-0002-0003-000000000001
+spec:
+  display_name: Interstellar
+  description: interstellar

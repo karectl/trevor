@@ -1,0 +1,47 @@
+apiVersion: identity.karectl.io/v1alpha1
+kind: User
+metadata:
+  name: researcher-1
+  namespace: trevor-dev
+  labels:
+    app.kubernetes.io/managed-by: tilt
+    cr8tor.io/created-at: "20260426"
+spec:
+  username: researcher-1
+  given_name: Alice
+  family_name: Researcher
+  affiliation: Lancaster University
+  email: researcher-1@test.local
+  enabled: true
+---
+apiVersion: identity.karectl.io/v1alpha1
+kind: User
+metadata:
+  name: checker-1
+  namespace: trevor-dev
+  labels:
+    app.kubernetes.io/managed-by: tilt
+    cr8tor.io/created-at: "20260426"
+spec:
+  username: checker-1
+  given_name: Bob
+  family_name: Checker
+  affiliation: Lancaster University
+  email: checker-1@test.local
+  enabled: true
+---
+apiVersion: identity.karectl.io/v1alpha1
+kind: User
+metadata:
+  name: checker-2
+  namespace: trevor-dev
+  labels:
+    app.kubernetes.io/managed-by: tilt
+    cr8tor.io/created-at: "20260426"
+spec:
+  username: checker-2
+  given_name: Carol
+  family_name: Senior
+  affiliation: Lancaster University
+  email: checker-2@test.local
+  enabled: true

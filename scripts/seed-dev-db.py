@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Seed the dev postgres DB with real Keycloak users and project memberships.
 
-Run after `tilt up` when postgres and keycloak are both healthy:
-
-    uv run python scripts/seed-dev-db.py
+Run after `tilt up` when postgres and keycloak are both healthy.
+Also registered as a Tilt local_resource so it runs automatically.
 
 Environment variables (defaults match sample.env / Tilt stack):
     DATABASE_URL          postgres connection string
@@ -32,10 +31,18 @@ KEYCLOAK_REALM = os.environ.get("KEYCLOAK_REALM", "karectl")
 KC_ADMIN_USER = os.environ.get("KEYCLOAK_ADMIN_USERNAME", "admin")
 KC_ADMIN_PASS = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")
 
-# Project CRD name that must already exist in the DB (created by CR8TOR sync).
-PROJECT_CRD = "lancs-tre-proj-1"
+# The project CRD name that is applied by Tilt (deploy/dev/sample-project/).
+# CRD sync will create/update the Project row from the CRD; seed just ensures
+# the row exists and that checker memberships are assigned (checkers are not
+# expressed as Group CRDs — they are trevor-internal roles).
+PROJECT_CRD = "interstellar"
+PROJECT_DISPLAY_NAME = "Interstellar"
+PROJECT_UUID = uuid.UUID("a1b2c3d4-0001-0002-0003-000000000001")
 
-# Dev users to seed: (keycloak_username, role_in_project, given, family, affiliation)
+# Dev users: (keycloak_username, role_in_project, given, family, affiliation)
+# role=None means no membership (admin-user gets access via realm role only).
+# researcher-1's researcher membership comes from CRD sync (Group CRD);
+# we still upsert the User row here so the record exists before first login.
 DEV_USERS = [
     ("researcher-1", "researcher", "Alice", "Researcher", "Lancaster University"),
     ("checker-1", "output_checker", "Bob", "Checker", "Lancaster University"),
@@ -77,22 +84,28 @@ async def seed(session: AsyncSession, kc_users: dict[str, dict]) -> None:
     from trevor.models.project import Project, ProjectMembership, ProjectRole
     from trevor.models.user import User
 
-    # Resolve or create project
+    # ── Project ──────────────────────────────────────────────────────────────
     result = await session.exec(select(Project).where(Project.crd_name == PROJECT_CRD))
     project = result.first()
     if project is None:
         project = Project(
-            id=uuid.UUID("81519810-7d30-448e-a508-c5fc9058be55"),
+            id=PROJECT_UUID,
             crd_name=PROJECT_CRD,
-            display_name="Seahorse Study",
+            display_name=PROJECT_DISPLAY_NAME,
             synced_at=_utcnow(),
         )
         session.add(project)
         await session.flush()
         print(f"  Created project: {project.display_name} ({project.id})")
     else:
+        # Ensure display_name is up to date (may have been set by CRD sync).
+        if project.display_name != PROJECT_DISPLAY_NAME:
+            project.display_name = PROJECT_DISPLAY_NAME
+            session.add(project)
+            await session.flush()
         print(f"  Project: {project.display_name} ({project.id})")
 
+    # ── Users + memberships ───────────────────────────────────────────────────
     for kc_username, role, given, family, affiliation in DEV_USERS:
         kc_user = kc_users.get(kc_username)
         if kc_user is None:
@@ -100,13 +113,12 @@ async def seed(session: AsyncSession, kc_users: dict[str, dict]) -> None:
             continue
 
         kc_sub = kc_user["id"]
-        email = kc_user.get("email", f"{kc_username}@test.local")
+        email = kc_user.get("email") or f"{kc_username}@test.local"
 
-        # Upsert User by keycloak_sub
+        # Upsert User by keycloak_sub, fall back to username match.
         result = await session.exec(select(User).where(User.keycloak_sub == kc_sub))
         user = result.first()
         if user is None:
-            # Also check by username in case created without keycloak_sub
             result2 = await session.exec(select(User).where(User.username == kc_username))
             user = result2.first()
 
@@ -128,7 +140,6 @@ async def seed(session: AsyncSession, kc_users: dict[str, dict]) -> None:
             await session.flush()
             print(f"  Created user: {kc_username} ({user.id})")
         else:
-            # Update keycloak_sub if missing
             if user.keycloak_sub != kc_sub:
                 user.keycloak_sub = kc_sub
                 session.add(user)
@@ -136,8 +147,11 @@ async def seed(session: AsyncSession, kc_users: dict[str, dict]) -> None:
             print(f"  Existing user: {kc_username} ({user.id})")
 
         if role is None:
-            continue  # admin-user has no project membership (admin via realm role)
+            continue
 
+        # Assign membership — for researcher-1 this is also done by CRD sync,
+        # but seeding it here ensures it exists on first tilt up before the
+        # first CRD sync cron fires.
         project_role = ProjectRole(role)
         result = await session.exec(
             select(ProjectMembership).where(
@@ -146,27 +160,29 @@ async def seed(session: AsyncSession, kc_users: dict[str, dict]) -> None:
                 ProjectMembership.role == project_role,
             )
         )
-        membership = result.first()
-        if membership is None:
-            membership = ProjectMembership(
-                id=uuid.uuid4(),
-                user_id=user.id,
-                project_id=project.id,
-                role=project_role,
-                assigned_at=_utcnow(),
+        if result.first() is None:
+            session.add(
+                ProjectMembership(
+                    id=uuid.uuid4(),
+                    user_id=user.id,
+                    project_id=project.id,
+                    role=project_role,
+                    assigned_at=_utcnow(),
+                )
             )
-            session.add(membership)
             await session.flush()
             print(f"    → membership: {role}")
         else:
             print(f"    → membership exists: {role}")
 
-    # checker-2 also gets senior_checker
+    # checker-2 also gets senior_checker role.
     kc_user = kc_users.get("checker-2")
     if kc_user:
-        kc_sub = kc_user["id"]
-        result = await session.exec(select(User).where(User.keycloak_sub == kc_sub))
+        result = await session.exec(select(User).where(User.keycloak_sub == kc_user["id"]))
         user = result.first()
+        if user is None:
+            result2 = await session.exec(select(User).where(User.username == "checker-2"))
+            user = result2.first()
         if user:
             result = await session.exec(
                 select(ProjectMembership).where(

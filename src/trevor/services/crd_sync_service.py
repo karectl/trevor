@@ -35,7 +35,7 @@ def parse_project_crd(crd_raw: dict) -> dict:
         {
             "project_id": UUID | None,   # from cr8tor.io/project-id label
             "crd_name": str,             # metadata.name
-            "display_name": str,         # spec.description or metadata.name
+            "display_name": str,         # spec.display_name → spec.description → metadata.name
         }
     """
     metadata = crd_raw.get("metadata", {})
@@ -48,7 +48,9 @@ def parse_project_crd(crd_raw: dict) -> dict:
     return {
         "project_id": project_id,
         "crd_name": metadata.get("name", ""),
-        "display_name": spec.get("description", "") or metadata.get("name", ""),
+        "display_name": (
+            spec.get("display_name", "") or spec.get("description", "") or metadata.get("name", "")
+        ),
     }
 
 
