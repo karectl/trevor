@@ -241,6 +241,26 @@ Deliverables:
 
 ---
 
+## Iteration 12.5 — Checker UI Redesign (Split-Pane Review)
+
+**Goal**: Redesign output checker UI from flat review queue to three-level drill-down (project list → request list → split-pane review) inspired by SACRO Outputs Viewer, adapted for trevor's domain model.
+
+Spec: `spec/iterations/iteration-12.5-spec.md`
+
+Deliverables:
+- Project list page: card grid with pending request counts and oldest wait time
+- Per-project request list with agent decision badges
+- Full-viewport split-pane review form:
+  - Left sidebar: object list with status indicators, Datastar-powered client-side selection
+  - Right detail panel: metadata grid, researcher justification, agent assessment (statbarn confirmation, disclosure risk, rule checks, narrative), per-object approve/reject controls
+  - Bottom footer: overall decision radios, summary input, submit
+- Agent findings parsed per-object from `Review.findings` JSON
+- Researcher metadata (justification, suppression notes) surfaced to checker
+- All-or-none release model enforced in UI
+- 4 new tests (164 total)
+
+---
+
 ## Iteration 13 — CRD Sync Reconciler
 
 **Goal**: Automatically sync CR8TOR Project, User, and Group CRDs into trevor's database.

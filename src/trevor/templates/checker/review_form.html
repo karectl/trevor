@@ -1,76 +1,220 @@
-{% extends 'base.html' %}
-{% block title %}Review — {{ airlock_request.title }} — trevor{% endblock %}
-{% block content %}
-<div class="page-header">
-  <h1>Review: {{ airlock_request.title }}</h1>
-  <p>{{ airlock_request.direction }} &middot; <span class="badge badge-{{ airlock_request.status }}">{{ airlock_request.status|replace("_", " ") }}</span></p>
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review — {{ airlock_request.title }} — trevor</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@starfederation/datastar@1.0.0-beta.11/bundles/datastar.js"></script>
+</head>
+<body>
+<div class="rv-shell">
 
-{# Objects + agent findings #}
-<h2 class="mb-1" style="font-size:1rem;">Objects</h2>
-{% for obj in objects %}
-<div class="card">
-  <div class="flex justify-between align-center">
-    <div>
-      <strong>{{ obj.filename }}</strong>
-      <span class="text-muted text-sm">v{{ obj.version }} &middot; {{ obj.output_type }} &middot; {{ (obj.size_bytes / 1024)|round(1) }}KB</span>
+  {# ---- Header bar ---- #}
+  <header class="rv-header">
+    <div class="rv-header-left">
+      <a href="/ui/review/project/{{ airlock_request.project_id }}" class="rv-back" title="Back to request list">&larr;</a>
+      <span class="rv-brand">trevor</span>
+      <span class="rv-title">{{ airlock_request.title }}</span>
+      <span class="badge badge-{{ airlock_request.status }}">{{ airlock_request.status|replace("_", " ") }}</span>
     </div>
-    <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ") }}</span>
+    <div class="rv-header-right">
+      {% set all_decided = objects|selectattr('state', 'ne', 'PENDING')|list|length == objects|length %}
+      {% set all_approved = objects|selectattr('state', 'equalto', 'APPROVED')|list|length == objects|length and objects|length > 0 %}
+      <span class="rv-progress text-sm text-muted">
+        {{ objects|selectattr('state', 'ne', 'PENDING')|list|length }}/{{ objects|length }} reviewed
+      </span>
+      <span class="user-info">{{ user.display_name }}</span>
+      <a href="/auth/logout" class="rv-logout text-sm">Log out</a>
+    </div>
+  </header>
+
+  {# ---- Main split ---- #}
+  <div class="rv-main" data-store='{ "selected": 0 }'>
+
+    {# ---- Sidebar: object list ---- #}
+    <aside class="rv-sidebar">
+      <div class="rv-sidebar-head">
+        <span class="text-sm text-muted">{{ objects|length }} output{{ 's' if objects|length != 1 }}</span>
+      </div>
+      {% for obj in objects %}
+      <div class="rv-file-row"
+           data-class-rv-file-selected="$selected === {{ loop.index0 }}"
+           data-on-click="$selected = {{ loop.index0 }}"
+           data-attr-data-state="{{ obj.state }}">
+        <span class="rv-file-indicator rv-indicator-{{ obj.state|lower }}"></span>
+        <div class="rv-file-info">
+          <div class="rv-file-name">{{ obj.filename }}</div>
+          <div class="rv-file-meta text-sm text-muted">
+            v{{ obj.version }} &middot; {{ obj.output_type }}
+            {% if obj.statbarn %}&middot; {{ obj.statbarn }}{% endif %}
+            &middot; {{ (obj.size_bytes / 1024)|round(1) }}KB
+          </div>
+        </div>
+        <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ")|lower }}</span>
+      </div>
+      {% endfor %}
+    </aside>
+
+    {# ---- Detail panel: one per object, toggled by Datastar ---- #}
+    <section class="rv-detail">
+      {% for obj in objects %}
+      <div class="rv-detail-pane" data-show="$selected === {{ loop.index0 }}">
+
+        <h2>{{ obj.filename }}</h2>
+
+        <div class="rv-meta-grid">
+          <div class="rv-meta-label">Output type</div>
+          <div class="rv-meta-value">{{ obj.output_type }}</div>
+
+          <div class="rv-meta-label">Statbarn category</div>
+          <div class="rv-meta-value">{{ obj.statbarn or '—' }}</div>
+
+          <div class="rv-meta-label">Version</div>
+          <div class="rv-meta-value">{{ obj.version }}</div>
+
+          <div class="rv-meta-label">Size</div>
+          <div class="rv-meta-value">{{ (obj.size_bytes / 1024)|round(1) }}KB</div>
+
+          <div class="rv-meta-label">Uploaded</div>
+          <div class="rv-meta-value">{{ obj.uploaded_at.strftime('%d %B %Y at %H:%M') }}</div>
+
+          <div class="rv-meta-label">SHA-256</div>
+          <div class="rv-meta-value rv-mono text-sm">{{ obj.checksum_sha256[:16] }}…</div>
+        </div>
+
+        {# ---- Metadata (researcher justification etc) ---- #}
+        {% set meta = object_metadata.get(obj.logical_object_id) %}
+        {% if meta %}
+        <div class="rv-section">
+          <h3>Researcher metadata</h3>
+          <div class="rv-meta-grid">
+            {% if meta.description %}
+            <div class="rv-meta-label">Description</div>
+            <div class="rv-meta-value">{{ meta.description }}</div>
+            {% endif %}
+            {% if meta.researcher_justification %}
+            <div class="rv-meta-label">Justification</div>
+            <div class="rv-meta-value">{{ meta.researcher_justification }}</div>
+            {% endif %}
+            {% if meta.suppression_notes %}
+            <div class="rv-meta-label">Suppression notes</div>
+            <div class="rv-meta-value">{{ meta.suppression_notes }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {# ---- Agent assessment for this object ---- #}
+        {% set assessment = agent_assessments.get(obj.id|string) %}
+        {% if assessment %}
+        <div class="rv-section">
+          <h3>Agent assessment</h3>
+          <div class="rv-meta-grid">
+            <div class="rv-meta-label">Statbarn confirmed</div>
+            <div class="rv-meta-value">
+              {% if assessment.statbarn_confirmed %}
+              <span class="rv-pass-badge">Yes</span>
+              {% else %}
+              <span class="rv-fail-badge">No</span>
+              {% endif %}
+            </div>
+
+            <div class="rv-meta-label">Disclosure risk</div>
+            <div class="rv-meta-value">
+              <span class="rv-risk-{{ assessment.disclosure_risk }}">{{ assessment.disclosure_risk }}</span>
+            </div>
+
+            <div class="rv-meta-label">Recommendation</div>
+            <div class="rv-meta-value">
+              <span class="badge badge-{{ assessment.recommendation|upper }}">{{ assessment.recommendation }}</span>
+            </div>
+          </div>
+
+          {% if assessment.rule_checks %}
+          <div class="rv-rules">
+            <h4>Rule checks</h4>
+            {% for rule in assessment.rule_checks %}
+            <div class="rv-rule rv-rule-{{ 'pass' if rule.passed else 'fail' }}">
+              <span class="rv-rule-icon">{{ '✓' if rule.passed else '✗' }}</span>
+              <span class="rv-rule-name">{{ rule.rule }}</span>
+              <span class="rv-rule-severity rv-severity-{{ rule.severity }}">{{ rule.severity }}</span>
+              <span class="rv-rule-detail text-sm text-muted">{{ rule.detail }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {% if assessment.explanation %}
+          <div class="rv-agent-narrative">
+            <h4>Agent narrative</h4>
+            <p>{{ assessment.explanation }}</p>
+          </div>
+          {% endif %}
+        </div>
+        {% elif agent_review %}
+        <div class="rv-section">
+          <h3>Agent review</h3>
+          <p>{{ agent_review.summary }}</p>
+        </div>
+        {% endif %}
+
+        {# ---- Per-object review controls ---- #}
+        {% if obj.state.value == "PENDING" %}
+        <div class="rv-section rv-review-controls">
+          <h3>Review decision</h3>
+          <p class="rv-review-note text-sm text-muted">You cannot reject this output until you add a comment.</p>
+          <div class="rv-btn-group">
+            <button type="button" class="rv-approve-btn" data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='approved'; this.closest('.rv-btn-group').querySelector('.rv-reject-btn').classList.remove('rv-btn-active'); this.classList.add('rv-btn-active')">Approve</button>
+            <button type="button" class="rv-reject-btn" data-on-click="document.getElementById('obj_{{ obj.id }}_decision').value='rejected'; this.closest('.rv-btn-group').querySelector('.rv-approve-btn').classList.remove('rv-btn-active'); this.classList.add('rv-btn-active')">Reject</button>
+          </div>
+          <div class="rv-comment mt-1">
+            <label for="obj_{{ obj.id }}_feedback" class="text-sm">Comment on {{ obj.filename }}:</label>
+            <textarea id="obj_{{ obj.id }}_feedback" name="obj_{{ obj.id }}_feedback" form="review-form" placeholder="Required for rejection"></textarea>
+          </div>
+        </div>
+        {% else %}
+        <div class="rv-section">
+          <div class="rv-decided">
+            <span class="badge badge-{{ obj.state }}">{{ obj.state|replace("_", " ")|lower }}</span>
+            <span class="text-sm text-muted">Already decided</span>
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+      {% endfor %}
+    </section>
+
   </div>
-</div>
-{% endfor %}
 
-{% if agent_review %}
-<div class="card mt-2">
-  <h3 style="font-size:.9rem;">Agent Review Summary</h3>
-  <p>{{ agent_review.summary }}</p>
-  {% if agent_review.findings %}
-  <ul class="text-sm mt-1">
-    {% for f in agent_review.findings %}<li>{{ f }}</li>{% endfor %}
-  </ul>
-  {% endif %}
-</div>
-{% endif %}
+  {# ---- Bottom bar with submit ---- #}
+  <footer class="rv-footer">
+    <form id="review-form" method="post" action="/ui/review/{{ airlock_request.id }}" class="rv-footer-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% for obj in objects %}
+      {% if obj.state.value == "PENDING" %}
+      <input type="hidden" id="obj_{{ obj.id }}_decision" name="obj_{{ obj.id }}_decision" value="">
+      {% endif %}
+      {% endfor %}
 
-{# Review form #}
-<h2 class="mt-2 mb-1" style="font-size:1rem;">Submit Review</h2>
-<div class="card">
-  <form method="post" action="/ui/review/{{ airlock_request.id }}">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <div class="form-group">
-      <label>Overall Decision</label>
-      <div class="flex gap-1">
-        <label><input type="radio" name="decision" value="approved" required> Approve</label>
-        <label><input type="radio" name="decision" value="changes_requested"> Changes Requested</label>
-        <label><input type="radio" name="decision" value="rejected"> Reject</label>
+      <div class="rv-footer-left">
+        <label class="rv-footer-label">Overall decision:</label>
+        <div class="rv-footer-radios">
+          <label><input type="radio" name="decision" value="approved" required> Approve all</label>
+          <label><input type="radio" name="decision" value="changes_requested"> Request changes</label>
+          <label><input type="radio" name="decision" value="rejected"> Reject</label>
+        </div>
       </div>
-    </div>
-
-    {% for obj in objects %}
-    {% if obj.state.value == "PENDING" %}
-    <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;margin-bottom:.75rem;">
-      <legend class="text-sm" style="padding:0 .5rem">{{ obj.filename }}</legend>
-      <div class="form-group">
-        <label>Decision</label>
-        <select name="obj_{{ obj.id }}_decision">
-          <option value="approved">Approve</option>
-          <option value="changes_requested">Changes Requested</option>
-          <option value="rejected">Reject</option>
-        </select>
+      <div class="rv-footer-center">
+        <input type="text" name="summary" placeholder="Summary (optional)" class="rv-summary-input">
       </div>
-      <div class="form-group">
-        <label>Feedback</label>
-        <textarea name="obj_{{ obj.id }}_feedback" placeholder="Optional feedback for this object"></textarea>
+      <div class="rv-footer-right">
+        <button type="submit" class="btn btn-primary">Submit Review</button>
       </div>
-    </fieldset>
-    {% endif %}
-    {% endfor %}
+    </form>
+  </footer>
 
-    <div class="form-group">
-      <label for="summary">Summary</label>
-      <textarea name="summary" id="summary" placeholder="Overall review summary"></textarea>
-    </div>
-    <button type="submit" class="btn btn-primary">Submit Review</button>
-  </form>
 </div>
-{% endblock %}
+</body>
+</html>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -505,31 +506,109 @@ async def request_release(
 # ---------------------------------------------------------------------------
 
 
+def _humanize_timedelta(dt: datetime) -> str:
+    """Rough human-readable time since *dt*."""
+    from datetime import UTC
+
+    delta = datetime.now(UTC).replace(tzinfo=None) - dt.replace(tzinfo=None)
+    hours = int(delta.total_seconds() // 3600)
+    if hours < 1:
+        return "< 1 hour"
+    if hours < 24:
+        return f"{hours}h"
+    days = hours // 24
+    return f"{days}d {hours % 24}h"
+
+
+async def _checker_project_ids(
+    user_id: uuid.UUID, session: AsyncSession, *, is_admin: bool
+) -> list[uuid.UUID]:
+    """Project IDs where user holds a checker role (or all if admin)."""
+    if is_admin:
+        result = await session.exec(select(Project.id))
+        return list(result.all())
+    memberships = await session.exec(
+        select(ProjectMembership.project_id).where(
+            ProjectMembership.user_id == user_id,
+            ProjectMembership.role.in_([
+                ProjectRole.OUTPUT_CHECKER,
+                ProjectRole.SENIOR_CHECKER,
+            ]),
+        )
+    )
+    return list(memberships.all())
+
+
 @router.get("/review", response_class=HTMLResponse)
-async def review_queue(
+async def review_project_list(
     request: Request,
     auth: CurrentAuth,
     session: Session,
 ) -> HTMLResponse:
-    query = select(AirlockRequest).where(AirlockRequest.status == AirlockRequestStatus.HUMAN_REVIEW)
-    if not auth.is_admin:
-        # Only projects where user is checker
-        memberships = await session.exec(
-            select(ProjectMembership.project_id).where(
-                ProjectMembership.user_id == auth.user.id,
-                ProjectMembership.role.in_([
-                    ProjectRole.OUTPUT_CHECKER,
-                    ProjectRole.SENIOR_CHECKER,
-                ]),
+    from sqlmodel import func
+
+    pids = await _checker_project_ids(auth.user.id, session, is_admin=auth.is_admin)
+    projects_info: list[dict] = []
+    for pid in pids:
+        project = await session.get(Project, pid)
+        if not project:
+            continue
+        # Count pending HUMAN_REVIEW requests
+        count_result = await session.exec(
+            select(func.count(AirlockRequest.id)).where(
+                AirlockRequest.project_id == pid,
+                AirlockRequest.status == AirlockRequestStatus.HUMAN_REVIEW,
             )
         )
-        pids = list(memberships.all())
-        query = query.where(AirlockRequest.project_id.in_(pids)) if pids else query.where(False)
-    query = query.order_by(AirlockRequest.updated_at)
+        pending_count = count_result.one()
+        # Oldest waiting
+        oldest_result = await session.exec(
+            select(AirlockRequest.updated_at)
+            .where(
+                AirlockRequest.project_id == pid,
+                AirlockRequest.status == AirlockRequestStatus.HUMAN_REVIEW,
+            )
+            .order_by(AirlockRequest.updated_at)
+            .limit(1)
+        )
+        oldest = oldest_result.first()
+        oldest_wait = _humanize_timedelta(oldest) if oldest else None
+        projects_info.append({
+            "project": project,
+            "pending_count": pending_count,
+            "oldest_wait": oldest_wait,
+        })
+
+    # Sort: most pending first
+    projects_info.sort(key=lambda p: p["pending_count"], reverse=True)
+
+    ctx = _base_ctx(request, auth)
+    ctx["projects"] = projects_info
+    return templates.TemplateResponse("checker/project_list.html", ctx)
+
+
+@router.get("/review/project/{project_id}", response_class=HTMLResponse)
+async def review_request_list(
+    request: Request,
+    project_id: uuid.UUID,
+    auth: CurrentAuth,
+    session: Session,
+) -> HTMLResponse:
+    project = await session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404)
+
+    query = (
+        select(AirlockRequest)
+        .where(
+            AirlockRequest.project_id == project_id,
+            AirlockRequest.status == AirlockRequestStatus.HUMAN_REVIEW,
+        )
+        .order_by(AirlockRequest.updated_at)
+    )
     result = await session.exec(query)
     reqs = list(result.all())
 
-    # Attach object counts and agent decisions
     for req in reqs:
         obj_result = await session.exec(
             select(OutputObject).where(
@@ -538,7 +617,6 @@ async def review_queue(
             )
         )
         req.object_count = len(list(obj_result.all()))  # type: ignore[attr-defined]
-        # Find agent review
         agent_rev = await session.exec(
             select(Review).where(
                 Review.request_id == req.id,
@@ -549,8 +627,8 @@ async def review_queue(
         req.agent_decision = ar.decision if ar else None  # type: ignore[attr-defined]
 
     ctx = _base_ctx(request, auth)
-    ctx["requests"] = reqs
-    return templates.TemplateResponse("checker/review_queue.html", ctx)
+    ctx.update(project=project, requests=reqs)
+    return templates.TemplateResponse("checker/request_list.html", ctx)
 
 
 @router.get("/review/{request_id}", response_class=HTMLResponse)
@@ -573,6 +651,13 @@ async def review_form(
     )
     objects = list(obj_result.all())
 
+    # Fetch metadata for each object
+    object_metadata: dict[uuid.UUID, OutputObjectMetadata] = {}
+    for obj in objects:
+        meta = await session.get(OutputObjectMetadata, obj.logical_object_id)
+        if meta:
+            object_metadata[obj.logical_object_id] = meta
+
     # Agent review
     agent_result = await session.exec(
         select(Review).where(
@@ -582,12 +667,20 @@ async def review_form(
     )
     agent_review = agent_result.first()
 
+    # Parse agent assessments from findings (keyed by object_id)
+    agent_assessments: dict[str, dict] = {}
+    if agent_review and agent_review.findings:
+        for finding in agent_review.findings:
+            if isinstance(finding, dict) and "object_id" in finding:
+                agent_assessments[str(finding["object_id"])] = finding
+
     ctx = _base_ctx(request, auth)
-    # 'request' key is Starlette request; pass domain object separately
     ctx.update(
         airlock_request=req,
         objects=objects,
+        object_metadata=object_metadata,
         agent_review=agent_review,
+        agent_assessments=agent_assessments,
     )
     return templates.TemplateResponse("checker/review_form.html", ctx)
 
@@ -652,7 +745,7 @@ async def review_submit(
         payload={"decision": decision},
     )
     await session.commit()
-    return RedirectResponse("/ui/review", status_code=303)
+    return RedirectResponse(f"/ui/review/project/{req.project_id}", status_code=303)
 
 
 # ---------------------------------------------------------------------------

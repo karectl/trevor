@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Review — Projects — trevor{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Review Queue</h1>
+  <p>Select a project to review pending requests</p>
+</div>
+
+{% if projects %}
+<div class="review-project-grid">
+  {% for p in projects %}
+  <a href="/ui/review/project/{{ p.project.id }}" class="review-project-card">
+    <div class="review-project-name">{{ p.project.display_name }}</div>
+    <div class="review-project-stats">
+      <span class="review-project-count">{{ p.pending_count }}</span>
+      <span class="review-project-label">pending request{{ 's' if p.pending_count != 1 }}</span>
+    </div>
+    {% if p.oldest_wait %}
+    <div class="review-project-wait text-muted text-sm">Oldest waiting {{ p.oldest_wait }}</div>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><p>No projects with pending reviews.</p></div>
+{% endif %}
+{% endblock %}

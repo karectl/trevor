@@ -192,3 +192,116 @@ async def test_ingress_add_object_slot_via_ui(admin_client: AsyncClient, db_sess
 
     r3 = await admin_client.get(f"/ui/requests/{req_id}/ingress-upload")
     assert "import.csv" in r3.text
+
+
+# ---------------------------------------------------------------------------
+# Checker UI redesign tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_review_project_list_html(admin_client: AsyncClient) -> None:
+    """Project list page renders for admin (checker role)."""
+    r = await admin_client.get("/ui/review")
+    assert r.status_code == 200
+    assert "Review Queue" in r.text
+
+
+@pytest.mark.anyio
+async def test_review_project_request_list(admin_client: AsyncClient, db_session) -> None:
+    """Request list page renders for a specific project."""
+    from trevor.models.project import Project
+
+    project = Project(crd_name="checker-proj-1", display_name="Checker Project")
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+
+    r = await admin_client.get(f"/ui/review/project/{project.id}")
+    assert r.status_code == 200
+    assert "Checker Project" in r.text
+
+
+@pytest.mark.anyio
+async def test_review_split_pane_renders(admin_client: AsyncClient, db_session) -> None:
+    """Split-pane review form renders with objects and agent info."""
+    from trevor.models.project import Project
+    from trevor.models.request import (
+        AirlockDirection,
+        AirlockRequest,
+        AirlockRequestStatus,
+        OutputObject,
+        OutputObjectMetadata,
+        OutputType,
+    )
+    from trevor.models.user import User
+
+    # Setup: user, project, request, object
+    user = User(
+        keycloak_sub="checker-test",
+        username="checkeruser",
+        email="checker@test.com",
+        given_name="Check",
+        family_name="Er",
+        affiliation="Test",
+        crd_name="checkeruser",
+        active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    project = Project(crd_name="split-pane-proj", display_name="Split Pane Proj")
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+
+    import uuid
+
+    req = AirlockRequest(
+        project_id=project.id,
+        direction=AirlockDirection.EGRESS,
+        title="Review test request",
+        submitted_by=user.id,
+        status=AirlockRequestStatus.HUMAN_REVIEW,
+    )
+    db_session.add(req)
+    await db_session.commit()
+    await db_session.refresh(req)
+
+    logical_id = uuid.uuid4()
+    obj = OutputObject(
+        request_id=req.id,
+        logical_object_id=logical_id,
+        filename="results.csv",
+        output_type=OutputType.TABULAR,
+        statbarn="regression",
+        storage_key="test/key",
+        checksum_sha256="abc123",
+        size_bytes=2048,
+        uploaded_by=user.id,
+    )
+    db_session.add(obj)
+    meta = OutputObjectMetadata(
+        logical_object_id=logical_id,
+        description="Test output",
+        researcher_justification="Safe to release",
+    )
+    db_session.add(meta)
+    await db_session.commit()
+
+    r = await admin_client.get(f"/ui/review/{req.id}")
+    assert r.status_code == 200
+    assert "results.csv" in r.text
+    assert "Review test request" in r.text
+    assert "regression" in r.text  # statbarn category visible
+    assert "Safe to release" in r.text  # researcher justification visible
+
+
+@pytest.mark.anyio
+async def test_review_project_404(admin_client: AsyncClient) -> None:
+    """Non-existent project returns 404."""
+    import uuid
+
+    r = await admin_client.get(f"/ui/review/project/{uuid.uuid4()}")
+    assert r.status_code == 404
