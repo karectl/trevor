@@ -25,20 +25,4 @@
     <div class="ws-nav-item-meta">v{{ obj.version }} &middot; {{ obj.output_type }}</div>
   </div>
   <span class="obj-state-dot dot-{{ obj.state }}"></span>
-  {% if can_edit or can_delete %}
-  <div class="ws-nav-item-actions">
-    {% if can_edit %}
-    <button type="button" title="Edit metadata"
-            data-on:click.stop="${{ selected_signal }} = {{ index }}; $showUpload = false; $showMeta = $showMeta === {{ index }} ? -1 : {{ index }}">
-      ✏️
-    </button>
-    {% endif %}
-    {% if can_delete %}
-    <button type="button" class="btn-danger" title="Delete object"
-            data-on:click.stop="$deleteObjId = '{{ obj.id }}'; $deleteObjName = '{{ obj.filename|replace("'", "\\'") }}'">
-      🗑️
-    </button>
-    {% endif %}
-  </div>
-  {% endif %}
 </div>

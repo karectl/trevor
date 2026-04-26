@@ -208,7 +208,19 @@
 
             <div class="flex justify-between align-center mb-2">
               <h2 class="ws-pane-title" style="margin-bottom:0">{{ obj.filename }}</h2>
-              <span class="badge badge-{{ obj.state }}">{{ obj.state|replace('_',' ') }}</span>
+              <div class="flex align-center gap-1">
+                <span class="badge badge-{{ obj.state }}">{{ obj.state|replace('_',' ') }}</span>
+                {% if airlock_request.status.value == "DRAFT" %}
+                <button type="button" class="btn btn-sm" title="Edit metadata"
+                        data-on:click="$showMeta = $showMeta === {{ loop.index0 }} ? -1 : {{ loop.index0 }}">
+                  Edit metadata
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" title="Delete object"
+                        data-on:click="$deleteObjId = '{{ obj.id }}'; $deleteObjName = '{{ obj.filename|replace("'", "\\'") }}'">
+                  Delete
+                </button>
+                {% endif %}
+              </div>
             </div>
 
             {# Core object properties #}
@@ -252,15 +264,7 @@
 
             {# Inline metadata section #}
             <div class="ws-meta-section">
-              <h3>Metadata
-                {% if airlock_request.status.value == "DRAFT" %}
-                <button type="button" class="btn btn-sm"
-                        data-on:click="$showMeta = $showMeta === {{ loop.index0 }} ? -1 : {{ loop.index0 }}"
-                        style="margin-left:.5rem">
-                  Edit
-                </button>
-                {% endif %}
-              </h3>
+              <h3>Metadata</h3>
 
               {# Read-only view #}
               <div data-show="$showMeta !== {{ loop.index0 }}">
