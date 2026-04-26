@@ -1,0 +1,16 @@
+trevor {{ .Chart.AppVersion }} deployed to {{ .Release.Namespace }}.
+
+API:
+  kubectl port-forward svc/{{ include "trevor.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  curl http://localhost:{{ .Values.service.port }}/health
+
+{{- if .Values.ingress.enabled }}
+Ingress:
+  {{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+  {{- end }}
+{{- end }}
+
+Metrics: GET /metrics (Prometheus scrape target)
+
+Logs: kubectl logs -f deploy/{{ include "trevor.fullname" . }}

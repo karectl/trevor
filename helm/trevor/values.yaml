@@ -92,3 +92,14 @@ redis:
 # ── PostgreSQL (sub-chart placeholder) ────────────────────────────────────────
 postgresql:
   enabled: false  # use an external PG in prod; enable for local testing only
+
+# ── Migrations ────────────────────────────────────────────────────────────────
+migrations:
+  enabled: false       # init container migration (dev/Tilt)
+  hookEnabled: true    # Helm pre-upgrade hook Job migration (recommended for prod)
+
+# ── Network policy ────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  ingressNamespace: "ingress-nginx"
+  monitoringNamespace: "monitoring"
