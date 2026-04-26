@@ -1,0 +1,96 @@
+# Production values for trevor Helm chart.
+# Override values.yaml defaults for production deployments.
+# Reference this file with: helm upgrade trevor ./helm/trevor -f values.production.yaml
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/karectl/trevor
+  pullPolicy: Always
+  tag: ""  # set via --set image.tag=<sha> in CI
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "1Gi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "520m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: trevor.karectl.example
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: trevor-tls
+      hosts:
+        - trevor.karectl.example
+
+env:
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  DEV_AUTH_BYPASS: "false"
+  NOTIFICATIONS_ENABLED: "true"
+  EMAIL_NOTIFICATIONS_ENABLED: "true"
+  STUCK_REQUEST_HOURS: "72"
+  URL_EXPIRY_WARNING_HOURS: "48"
+  CRD_SYNC_ENABLED: "true"
+  AGENT_LLM_ENABLED: "true"
+
+# All secrets must be pre-created in the cluster before deployment.
+# See docs/runbook.md for secret creation instructions.
+envFromSecrets:
+  - secretName: trevor-db
+    keys: [DATABASE_URL]
+  - secretName: trevor-redis
+    keys: [REDIS_URL]
+  - secretName: trevor-keycloak
+    keys: [KEYCLOAK_URL, KEYCLOAK_INTERNAL_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID]
+  - secretName: trevor-s3
+    keys: [S3_ENDPOINT_URL, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_QUARANTINE_BUCKET, S3_RELEASE_BUCKET]
+  - secretName: trevor-app
+    keys: [SECRET_KEY, TREVOR_BASE_URL]
+  - secretName: trevor-smtp
+    keys: [SMTP_HOST, SMTP_PORT, SMTP_FROM_ADDRESS, SMTP_USERNAME, SMTP_PASSWORD]
+  - secretName: trevor-agent
+    keys: [AGENT_OPENAI_BASE_URL, AGENT_MODEL_NAME, AGENT_API_KEY]
+
+worker:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "1Gi"
+
+redis:
+  enabled: false  # use external Redis (e.g. Redis Sentinel or Redis Cluster)
+
+postgresql:
+  enabled: false  # use external PostgreSQL (RDS, CloudNativePG, etc.)
+
+migrations:
+  enabled: false
+  hookEnabled: true  # pre-upgrade Helm hook runs Alembic before rollout
+
+networkPolicy:
+  enabled: true
+  ingressNamespace: "ingress-nginx"
+  monitoringNamespace: "monitoring"

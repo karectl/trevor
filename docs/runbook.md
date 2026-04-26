@@ -1,128 +1,179 @@
-# Runbook
+# trevor Runbook
 
-Operational guide for trevor in production.
+Operational reference for the trevor egress/airlock microservice.
 
-## Service overview
+---
 
-trevor is a stateless FastAPI service. State is in PostgreSQL and Redis. Kubernetes deployment with 2+ replicas behind a load balancer.
+## Deployment
 
-Components:
+### Prerequisites
 
-| Component | Image | Port |
-|---|---|---|
-| trevor API | `trevor:latest` | 8000 |
-| ARQ worker | `trevor:latest` (cmd: `arq trevor.worker.WorkerSettings`) | — |
-| PostgreSQL | managed or `bitnami/postgresql` | 5432 |
-| Redis | `bitnami/redis` | 6379 |
-| MinIO (non-AWS) | `minio/minio` | 9000 |
+- Kubernetes cluster (k3d locally; production: any CNCF-conformant cluster)
+- Helm 3
+- `kubectl` configured against the target cluster
+- Secrets pre-created (see [Secrets](#secrets))
 
-## Health check
-
-```
-GET /health → {"status": "ok", "version": "x.y.z"}
-```
-
-Kubernetes liveness and readiness probes target `/health`.
-
-## Startup
+### First-time install
 
 ```bash
-uv run alembic upgrade head   # run migrations (once, or as init container)
-uv run trevor                  # start API server (uvicorn on :8000)
-uv run arq trevor.worker.WorkerSettings  # start ARQ worker
+# Create namespace
+kubectl create namespace trevor
+
+# Create secrets (see Secrets section below)
+kubectl apply -f secrets/ -n trevor
+
+# Install chart
+helm upgrade --install trevor ./helm/trevor \
+  -n trevor \
+  -f helm/trevor/values.production.yaml \
+  --set image.tag=<sha>
 ```
 
-## Metrics
+### Rolling upgrade
 
-Prometheus scrape target: `GET /metrics` (no auth, plain text).
+```bash
+helm upgrade trevor ./helm/trevor \
+  -n trevor \
+  -f helm/trevor/values.production.yaml \
+  --set image.tag=<new-sha>
+```
 
-Key metrics:
+The `migrations.hookEnabled: true` default runs an Alembic `upgrade head` Job as a Helm pre-upgrade hook before the new pods roll out.
 
-| Metric | Description |
+### Rollback
+
+```bash
+helm rollback trevor -n trevor
+```
+
+If the migration hook has already run, you may need to run `alembic downgrade -1` manually before rolling back the chart.
+
+---
+
+## Secrets
+
+All secrets are Kubernetes `Secret` objects. Never put secret values in Helm values files.
+
+| Secret name | Keys |
 |---|---|
-| `trevor_requests_submitted_total` | Airlock requests submitted (by direction) |
-| `trevor_requests_approved_total` | Requests approved |
-| `trevor_requests_rejected_total` | Requests rejected |
-| `trevor_objects_uploaded_total` | Output objects uploaded |
-| `trevor_agent_reviews_total` | Agent reviews completed |
-| `http_requests_total` | HTTP requests by method/path/status |
-| `http_request_duration_seconds` | Request latency histogram |
+| `trevor-db` | `DATABASE_URL` — `postgresql+asyncpg://user:pass@host:5432/trevor` |
+| `trevor-redis` | `REDIS_URL` — `redis://:pass@host:6379/0` |
+| `trevor-keycloak` | `KEYCLOAK_URL`, `KEYCLOAK_INTERNAL_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID` |
+| `trevor-s3` | `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_QUARANTINE_BUCKET`, `S3_RELEASE_BUCKET` |
+| `trevor-app` | `SECRET_KEY` (random 32-byte hex), `TREVOR_BASE_URL` |
+| `trevor-smtp` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM_ADDRESS`, `SMTP_USERNAME`, `SMTP_PASSWORD` |
+| `trevor-agent` | `AGENT_OPENAI_BASE_URL`, `AGENT_MODEL_NAME`, `AGENT_API_KEY` |
 
-## Logging
+Generate `SECRET_KEY`:
 
-Structured JSON logs written to stdout. Fields: `level`, `timestamp`, `event`, plus context fields (`request_id`, `user_id`, `trace_id` where available).
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
 
-Log levels: `DEBUG`, `INFO` (default), `WARNING`, `ERROR`. Set via `LOG_LEVEL` env var.
-
-## Tracing
-
-OpenTelemetry tracing disabled by default. Enable with `OTEL_ENABLED=true`. Configure endpoint via `OTEL_EXPORTER_OTLP_ENDPOINT` (default: `http://otel-collector:4317`).
-
-## ARQ worker
-
-Processes `agent_review_job` tasks. Concurrency: default ARQ settings (1 worker, 10 concurrent tasks). Scale horizontally by running multiple worker pods. Each job is idempotent — duplicate processing harmless (state check prevents re-review).
-
-Stuck jobs: requests stuck in `AGENT_REVIEW` or `HUMAN_REVIEW` for more than `STUCK_REQUEST_HOURS` (default 72) are surfaced in the admin metrics dashboard.
-
-## Incident response
-
-### Request stuck in AGENT_REVIEW
-
-1. Check ARQ worker logs for errors.
-2. Check Redis connectivity.
-3. Check LLM endpoint (`AGENT_OPENAI_BASE_URL`) if LLM enabled.
-4. If worker is healthy, check `audit_events` for the request — confirm `request.submitted` event exists.
-5. If stuck, manually advance via DB update (last resort — create audit event too).
-
-### Database connection failure
-
-1. Check `DATABASE_URL` env var.
-2. Check PostgreSQL pod/service health.
-3. trevor returns 500 on all requests — check `/health` endpoint.
-4. Restart trevor pods after DB is restored (connection pool auto-reconnects but may need flush).
-
-### S3 / MinIO unreachable
-
-1. File uploads return 500. Object downloads fail.
-2. Check `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
-3. Verify bucket exists: `trevor-quarantine`, `trevor-release`.
-4. trevor does not cache S3 connections — resumes automatically when S3 is restored.
-
-### High error rate (5xx)
-
-1. Check structured logs: `level=ERROR` events.
-2. Check Prometheus: `http_requests_total{status=~"5.."}`
-3. Check DB and Redis connectivity.
-4. Check OTel traces if enabled.
-
-## Backup and recovery
-
-- PostgreSQL: standard pg_dump / WAL archiving. Include all tables. `audit_events` is append-only — critical for compliance.
-- Redis: transient (ARQ queues). Loss means queued jobs must be resubmitted manually or will be retried on restart.
-- S3: enable versioning and cross-region replication on `trevor-release` bucket (release artifacts are permanent).
+---
 
 ## Migrations
 
-```bash
-# Check pending migrations
-uv run alembic current
-uv run alembic history
+trevor uses Alembic async migrations. All migrations are in `alembic/versions/`.
 
-# Apply migrations
+```bash
+# Apply all pending migrations
 uv run alembic upgrade head
 
-# Rollback one step (dev only)
-uv run alembic downgrade -1
+# Check current revision
+uv run alembic current
+
+# Show migration history
+uv run alembic history
+
+# Generate a new migration (after model changes)
+uv run alembic revision --autogenerate -m "describe the change"
 ```
 
-In production, run migrations as a Kubernetes Job or init container before rolling out new API pods.
+**SQLite autogenerate caveats** (local dev only):
+
+- `import sqlmodel` must be present in the generated migration file — add it if missing.
+- `projects.status` enum changes are phantom-detected — remove them manually.
+- Use `op.batch_alter_table()` for any `ALTER COLUMN` on SQLite.
+
+**Production (PostgreSQL)**: autogenerate is reliable. Review each generated migration before committing.
+
+---
+
+## Failure modes
+
+### App pod CrashLoopBackOff
+
+1. `kubectl logs -n trevor deploy/trevor --previous`
+2. Common causes:
+   - Missing or malformed secret (check `DATABASE_URL`, `SECRET_KEY`)
+   - DB not reachable (check `trevor-db` secret, network policy)
+   - Alembic migration not yet applied (run `alembic upgrade head` Job)
+
+### Worker not processing jobs
+
+1. `kubectl logs -n trevor deploy/trevor-worker`
+2. Check Redis connectivity (`REDIS_URL` secret)
+3. Check `arq` queue: `redis-cli -u $REDIS_URL LLEN arq:queue`
+4. Restart worker: `kubectl rollout restart deploy/trevor-worker -n trevor`
+
+### SSE connections not updating
+
+SSE streams poll every 2 seconds for up to 5 minutes. If the UI badge does not update:
+1. Check browser dev tools → Network → EventSource for errors
+2. Check app pod logs for DB errors
+3. Ensure the pod has DB connectivity
+
+### Presigned URL expired
+
+If a researcher reports an expired download link:
+1. An admin can regenerate via `/ui/admin/requests/{id}` → "Generate new URL"
+2. The `url_expiry_warning_job` cron runs daily at midnight and warns 48h in advance
+
+### Stuck request (SLA breach)
+
+The `stuck_request_alert_job` runs daily at 06:00 and notifies output checkers when a request has been in `SUBMITTED` or `HUMAN_REVIEW` for longer than `STUCK_REQUEST_HOURS` (default 72h).
+
+---
+
+## Monitoring
+
+trevor emits structured JSON logs (`LOG_FORMAT=json`). Recommended Grafana/Loki setup:
+
+- **Loki** — ingest all pod logs; filter on `service=trevor`
+- **Alerting**:
+  - `level=error` count > 0 in 5 min window
+  - `agent_review_job failed` log line
+  - Pod restart count > 2 in 10 min
+
+OpenTelemetry: set `OTEL_ENABLED=true` and `OTEL_EXPORTER_OTLP_ENDPOINT` to enable trace export. The `OTEL_SERVICE_NAME` defaults to `trevor`.
+
+### Key metrics to watch
+
+| Signal | Source | Threshold |
+|---|---|---|
+| Request queue depth | `/admin/metrics` | > 20 pending |
+| Agent review failure rate | App logs | Any `agent_review_failed` event |
+| Worker lag | Redis `arq:queue` length | > 50 |
+| Error rate (5xx) | Ingress access logs | > 1% of requests |
+| DB connection pool exhaustion | App logs | `QueuePool limit` errors |
+
+---
 
 ## Scaling
 
-trevor API is stateless — scale horizontally. ARQ workers can also scale horizontally (multiple pods reading from same Redis queue).
+trevor is stateless — all state is in PostgreSQL and Redis (C-08).
 
-Recommended minimums for production:
-- API: 2 replicas, 256m CPU, 256Mi memory
-- Worker: 1 replica, 256m CPU, 256Mi memory
-- PostgreSQL: 1 primary + 1 replica
-- Redis: single instance (or sentinel for HA)
+- **Horizontal app scaling**: increase `replicaCount` or enable `autoscaling`. No coordination needed between replicas.
+- **Worker scaling**: increase `worker.replicaCount`. ARQ workers are safe to run in parallel — jobs are claimed atomically from the Redis queue.
+- **DB connection pooling**: SQLAlchemy's default pool size is 5 per process. With 3 app replicas + 2 workers = 25 connections max. Ensure PostgreSQL `max_connections` allows headroom.
+- **S3**: SeaweedFS or any S3-compatible store. No trevor-side pooling — `aioboto3` manages connections per request.
+
+---
+
+## Backup and recovery
+
+- **Database**: standard PostgreSQL backup (pg_dump, WAL archiving). trevor's `AuditEvent` table is append-only — never restore to a state that loses audit rows.
+- **S3 quarantine bucket**: objects are immutable after upload. Back up the bucket with versioning enabled.
+- **S3 release bucket**: RO-Crate zips. Regenerable from quarantine + DB if lost (run `release_job` again on a restored request).
+- **Redis**: transient — ARQ job queue. Jobs can be re-enqueued manually if Redis is lost mid-flight.

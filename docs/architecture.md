@@ -171,6 +171,8 @@ tests/
   test_*.py                # 252 tests across 18 test files
 alembic/                   # async Alembic config + migrations
 docs/                      # this documentation (zensical)
+  runbook.md               # deployment, migrations, failure modes, monitoring, scaling
+  security-checklist.md    # CSRF, rate limiting, auth, secrets, container security
 helm/trevor/               # Helm chart skeleton
 deploy/dev/
   crds/                    # CRD schema definitions

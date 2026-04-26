@@ -34,8 +34,65 @@ jobs:
       - name: Tests
         run: uv run pytest -v
 
+  migrate-postgres:
+    name: Alembic migrations (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: trevor
+          POSTGRES_PASSWORD: trevor
+          POSTGRES_DB: trevor_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U trevor"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.2"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run Alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://trevor:trevor@localhost:5432/trevor_test
+        run: uv run alembic upgrade head
+
+      - name: Run tests against PostgreSQL
+        env:
+          DATABASE_URL: postgresql+asyncpg://trevor:trevor@localhost:5432/trevor_test
+          DEV_AUTH_BYPASS: "true"
+        run: uv run pytest -v -x
+
+  helm-lint:
+    name: Helm lint & template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Helm lint (default values)
+        run: helm lint helm/trevor
+
+      - name: Helm lint (production values)
+        run: helm lint helm/trevor -f helm/trevor/values.production.yaml
+
+      - name: Helm template (smoke test)
+        run: helm template trevor helm/trevor -f helm/trevor/values.production.yaml > /dev/null
+
   build:
-    name: Docker build
+    name: Docker build & scan
     runs-on: ubuntu-latest
     needs: lint-test
     steps:
@@ -52,3 +109,13 @@ jobs:
           tags: trevor:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          load: true
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: trevor:ci
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
