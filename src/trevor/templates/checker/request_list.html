@@ -25,20 +25,20 @@
     </tr>
   </thead>
   <tbody>
-    {% for req in requests %}
+    {% for row in requests %}
     <tr>
-      <td>{{ req.title }}</td>
-      <td><span class="badge badge-{{ req.status }}">{{ req.status|replace("_", " ") }}</span></td>
-      <td>{{ req.object_count|default(0) }}</td>
+      <td>{{ row.req.title }}</td>
+      <td><span class="badge badge-{{ row.req.status }}">{{ row.req.status|replace("_", " ") }}</span></td>
+      <td>{{ row.object_count }}</td>
       <td>
-        {% if req.agent_decision %}
-        <span class="badge badge-{{ req.agent_decision|upper }}">{{ req.agent_decision }}</span>
-        {% elif req.status.value in ("SUBMITTED", "AGENT_REVIEW") %}
+        {% if row.agent_decision %}
+        <span class="badge badge-{{ row.agent_decision|upper }}">{{ row.agent_decision }}</span>
+        {% elif row.req.status.value in ("SUBMITTED", "AGENT_REVIEW") %}
         <span class="badge badge-agent-pending">Pending</span>
         {% else %}-{% endif %}
       </td>
-      <td class="text-muted text-sm">{{ req.updated_at.strftime('%Y-%m-%d %H:%M') if req.updated_at else '-' }}</td>
-      <td><a href="/ui/review/{{ req.id }}" class="btn btn-sm btn-primary">Review</a></td>
+      <td class="text-muted text-sm">{{ row.req.updated_at.strftime('%Y-%m-%d %H:%M') if row.req.updated_at else '-' }}</td>
+      <td><a href="/ui/review/{{ row.req.id }}" class="btn btn-sm btn-primary">Review</a></td>
     </tr>
     {% endfor %}
   </tbody>

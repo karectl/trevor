@@ -783,6 +783,7 @@ async def review_request_list(
     result = await session.exec(query)
     reqs = list(result.all())
 
+    augmented = []
     for req in reqs:
         obj_result = await session.exec(
             select(OutputObject).where(
@@ -790,7 +791,7 @@ async def review_request_list(
                 OutputObject.state != OutputObjectState.SUPERSEDED,
             )
         )
-        req.object_count = len(list(obj_result.all()))  # type: ignore[attr-defined]
+        object_count = len(list(obj_result.all()))
         agent_rev = await session.exec(
             select(Review).where(
                 Review.request_id == req.id,
@@ -798,10 +799,15 @@ async def review_request_list(
             )
         )
         ar = agent_rev.first()
-        req.agent_decision = ar.decision if ar else None  # type: ignore[attr-defined]
+        agent_decision = ar.decision if ar else None
+        augmented.append({
+            "req": req,
+            "object_count": object_count,
+            "agent_decision": agent_decision,
+        })
 
     ctx = _base_ctx(request, auth)
-    ctx.update(project=project, requests=reqs)
+    ctx.update(project=project, requests=augmented)
     return templates.TemplateResponse("checker/request_list.html", ctx)
 
 
