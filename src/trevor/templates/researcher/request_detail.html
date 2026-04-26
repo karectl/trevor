@@ -48,7 +48,7 @@
 <div data-signals="{mainTab: 'objects', objIdx: 0, showUpload: false, showMeta: -1, deleteObjId: '', deleteObjName: ''}">
 
 {# ── Confirm-delete modal ── #}
-<div class="modal-overlay" data-show="deleteObjId.value !== ''">
+<div class="modal-overlay" style="display:none" data-show="deleteObjId.value !== ''">
   <div class="modal-box">
     <h3>Delete object?</h3>
     <p>
@@ -59,7 +59,7 @@
       <button type="button" class="btn"
               data-on-click="deleteObjId.value = ''; deleteObjName.value = ''">Cancel</button>
       <form method="post" style="display:inline"
-            data-bind-action="'/ui/requests/{{ airlock_request.id }}/objects/' + deleteObjId.value + '/delete'">
+            data-attr:action="'/ui/requests/{{ airlock_request.id }}/objects/' + deleteObjId.value + '/delete'">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="btn btn-danger">Delete</button>
       </form>
@@ -124,7 +124,7 @@
       <div class="ws-main">
 
         {# Upload form (toggled) #}
-        <div data-show="showUpload.value">
+        <div style="display:none" data-show="showUpload.value">
           <div class="ws-pane-title">Add New Object</div>
           <form method="post" action="/ui/requests/{{ airlock_request.id }}/upload"
                 enctype="multipart/form-data" id="upload-form">
@@ -279,7 +279,7 @@
               </div>
 
               {# Edit form #}
-              <div data-show="showMeta.value === {{ loop.index0 }}">
+              <div style="display:none" data-show="showMeta.value === {{ loop.index0 }}">
                 <form method="post"
                       action="/ui/requests/{{ airlock_request.id }}/objects/{{ obj.id }}/metadata">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -325,7 +325,7 @@
   </div>{# end objects tab #}
 
   {# ── Reviews tab ── #}
-  <div data-show="mainTab.value === 'reviews'">
+  <div style="display:none" data-show="mainTab.value === 'reviews'">
     {% if reviews %}
     {% for rev in reviews %}
     <div class="card">
@@ -353,7 +353,7 @@
   </div>
 
   {# ── Audit tab ── #}
-  <div data-show="mainTab.value === 'audit'">
+  <div style="display:none" data-show="mainTab.value === 'audit'">
     {% if audit_events %}
     <div class="card">
       <table>
