@@ -37,7 +37,8 @@ async def validate_bearer_token(token: str, settings: Settings) -> dict:
     """Validate a Bearer JWT against Keycloak JWKS. Returns claims dict."""
     oidc_config = await fetch_openid_config(settings.keycloak_server_url, settings.keycloak_realm)
     jwks = await get_jwks(oidc_config["jwks_uri"])
-    return validate_id_token(token, jwks, oidc_config["issuer"], settings.keycloak_client_id)
+    expected_issuer = f"{settings.keycloak_url}/realms/{settings.keycloak_realm}"
+    return validate_id_token(token, jwks, expected_issuer, settings.keycloak_client_id)
 
 
 async def _user_from_claims(

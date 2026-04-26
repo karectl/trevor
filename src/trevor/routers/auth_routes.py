@@ -140,10 +140,11 @@ async def callback(
         )
 
     jwks = await get_jwks(oidc_config["jwks_uri"])
+    # The JWT iss claim uses the browser-facing keycloak_url, not the internal
+    # URL used for server-side discovery. Derive expected issuer accordingly.
+    expected_issuer = f"{settings.keycloak_url}/realms/{settings.keycloak_realm}"
     try:
-        claims = validate_id_token(
-            id_token, jwks, oidc_config["issuer"], settings.keycloak_client_id
-        )
+        claims = validate_id_token(id_token, jwks, expected_issuer, settings.keycloak_client_id)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid ID token: {e}"
