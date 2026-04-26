@@ -204,7 +204,7 @@
 
           {% for obj in objects %}
           {%- set meta = object_metadata.get(obj.logical_object_id) -%}
-          <div data-show="$objIdx === {{ loop.index0 }}">
+          <div{% if not loop.first %} style="display:none"{% endif %} data-show="$objIdx === {{ loop.index0 }}">
 
             <div class="flex justify-between align-center mb-2">
               <h2 class="ws-pane-title" style="margin-bottom:0">{{ obj.filename }}</h2>

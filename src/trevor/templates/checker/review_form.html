@@ -69,7 +69,7 @@
     {# ---- Detail panel: one per object, toggled by Datastar ---- #}
     <section class="rv-detail">
       {% for obj in objects %}
-      <div class="rv-detail-pane" data-show="$selected === {{ loop.index0 }}">
+      <div class="rv-detail-pane"{% if not loop.first %} style="display:none"{% endif %} data-show="$selected === {{ loop.index0 }}">
 
         <div class="flex justify-between align-center mb-2">
           <h2 style="font-size:1.1rem;font-weight:600">{{ obj.filename }}</h2>
