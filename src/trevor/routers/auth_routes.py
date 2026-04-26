@@ -25,6 +25,7 @@ from trevor.session import (
     create_pkce_cookie,
     make_session_data,
     read_pkce_cookie,
+    read_session_cookie,
     set_session_cookie,
 )
 from trevor.settings import Settings, get_settings
@@ -172,7 +173,9 @@ async def callback(
     )
 
     # Build session cookie
-    session_data = make_session_data(claims, ttl_seconds=settings.session_ttl_seconds)
+    session_data = make_session_data(
+        claims, ttl_seconds=settings.session_ttl_seconds, id_token=id_token
+    )
 
     # Decode next URL from state
     try:
@@ -205,13 +208,30 @@ async def logout(
     oidc_config = await fetch_openid_config(settings.keycloak_server_url, settings.keycloak_realm)
     end_session_endpoint = oidc_config.get("end_session_endpoint", "")
 
-    post_logout_uri = str(request.base_url).rstrip("/") + "/ui/requests"
+    post_logout_uri = str(request.base_url).rstrip("/") + "/auth/login"
+
+    # Read id_token from session for id_token_hint (skips Keycloak confirmation page).
+    id_token_hint: str | None = None
+    session_cookie = request.cookies.get(settings.session_cookie_name)
+    if session_cookie:
+        session_data = read_session_cookie(
+            session_cookie, settings.secret_key, settings.session_ttl_seconds
+        )
+        if session_data and session_data.id_token:
+            id_token_hint = session_data.id_token
 
     if end_session_endpoint:
-        params = {
+        # Rewrite end_session_endpoint to browser-facing keycloak_url.
+        # Discovery doc returns internal hostname when keycloak_internal_url is set.
+        internal = settings.keycloak_internal_url
+        if internal and internal != settings.keycloak_url:
+            end_session_endpoint = end_session_endpoint.replace(internal, settings.keycloak_url, 1)
+        params: dict[str, str] = {
             "post_logout_redirect_uri": post_logout_uri,
             "client_id": settings.keycloak_client_id,
         }
+        if id_token_hint:
+            params["id_token_hint"] = id_token_hint
         logout_url = f"{end_session_endpoint}?{urllib.parse.urlencode(params)}"
     else:
         logout_url = post_logout_uri

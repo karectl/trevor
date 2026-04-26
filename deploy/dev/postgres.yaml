@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: trevor-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,8 +35,19 @@ spec:
               value: trevor
             - name: POSTGRES_PASSWORD
               value: trevor
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           ports:
             - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "trevor"]
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
           resources:
             requests:
               cpu: "100m"
@@ -32,6 +55,10 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data
 ---
 apiVersion: v1
 kind: Service

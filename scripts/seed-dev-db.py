@@ -77,15 +77,21 @@ async def seed(session: AsyncSession, kc_users: dict[str, dict]) -> None:
     from trevor.models.project import Project, ProjectMembership, ProjectRole
     from trevor.models.user import User
 
-    # Resolve project
+    # Resolve or create project
     result = await session.exec(select(Project).where(Project.crd_name == PROJECT_CRD))
     project = result.first()
     if project is None:
-        print(
-            f"  Project '{PROJECT_CRD}' not found — run migrations and ensure CR8TOR sync has run."
-        )  # noqa: E501
-        return
-    print(f"  Project: {project.display_name} ({project.id})")
+        project = Project(
+            id=uuid.UUID("81519810-7d30-448e-a508-c5fc9058be55"),
+            crd_name=PROJECT_CRD,
+            display_name="Seahorse Study",
+            synced_at=_utcnow(),
+        )
+        session.add(project)
+        await session.flush()
+        print(f"  Created project: {project.display_name} ({project.id})")
+    else:
+        print(f"  Project: {project.display_name} ({project.id})")
 
     for kc_username, role, given, family, affiliation in DEV_USERS:
         kc_user = kc_users.get(kc_username)

@@ -24,6 +24,7 @@ class SessionData:
     email: str
     realm_roles: list[str]
     exp: int  # Unix timestamp — session expiry
+    id_token: str = ""  # Raw ID token — passed as id_token_hint on logout
 
 
 def create_session_cookie(
@@ -112,6 +113,7 @@ def read_pkce_cookie(
 def make_session_data(
     claims: dict,
     ttl_seconds: int = 3600,
+    id_token: str = "",
 ) -> SessionData:
     """Build SessionData from ID token claims."""
     return SessionData(
@@ -122,4 +124,5 @@ def make_session_data(
         email=claims.get("email", ""),
         realm_roles=claims.get("realm_roles", []),
         exp=int(time.time()) + ttl_seconds,
+        id_token=id_token,
     )
