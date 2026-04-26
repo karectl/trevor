@@ -241,6 +241,130 @@ Deliverables:
 
 ---
 
+## Iteration 13 — CRD Sync Reconciler
+
+**Goal**: Automatically sync CR8TOR Project, User, and Group CRDs into trevor's database.
+
+Spec: `spec/iterations/iteration-13-spec.md`  
+ADRs: ADR-0012 (CRD sync design), ADR-0014 (kr8s client)
+
+Deliverables:
+- `kr8s` dependency for async Kubernetes API access
+- CRD client module (`crd.py`) — custom resource classes for Project, Group, User CRDs
+- Sync service (`crd_sync_service.py`) — parse CRDs, reconcile projects/users/memberships
+- ARQ cron job running every 5 minutes
+- RBAC manifest (ClusterRole + ClusterRoleBinding)
+- Researcher memberships derived from parent + analyst Group CRDs
+- Checker memberships preserved (never deleted by sync)
+- Role conflict detection and warning
+
+---
+
+## Iteration 14 — Notification Service: Core + In-App Backend
+
+**Goal**: Pluggable notification system with in-app notification storage and API.
+
+Spec: `spec/iterations/iteration-14-spec.md`  
+ADR: ADR-0009 (notification abstraction)
+
+Deliverables:
+- `Notification` DB model + Alembic migration
+- `NotificationEvent` dataclass, `NotificationBackend` protocol
+- `NotificationRouter` with error-isolated multi-backend dispatch
+- `InAppBackend` — writes to Notification table
+- ARQ job `send_notifications_job` for async dispatch
+- API: `GET /notifications`, `PATCH /notifications/{id}/read`, `GET /notifications/unread-count`
+- Nav bar badge showing unread notification count (static, SSE in iter 16)
+- Notification triggers wired into review, release, and state-transition flows
+
+---
+
+## Iteration 15 — Email Notification Backend
+
+**Goal**: SMTP email delivery for all notification events.
+
+Spec: `spec/iterations/iteration-15-spec.md`  
+ADR: ADR-0009
+
+Deliverables:
+- `aiosmtplib` dependency
+- `SmtpBackend` implementing `NotificationBackend` protocol
+- 7 Jinja2 email templates (HTML + plain-text): submitted, agent_report_ready, changes_requested, approved, rejected, released, url_expiring
+- Settings: `smtp_host`, `smtp_port`, `smtp_from_address`, `smtp_use_tls`
+- Error-isolated dispatch (SMTP failure logged, never blocks)
+- Registration in `NotificationRouter` when `email_notifications_enabled=True`
+
+---
+
+## Iteration 16 — SSE Live Updates
+
+**Goal**: Real-time UI updates via Server-Sent Events using Datastar's native SSE support.
+
+Spec: `spec/iterations/iteration-16-spec.md`  
+ADR: ADR-0015 (SSE live updates)
+
+Deliverables:
+- SSE helper utility for Datastar fragment events
+- `GET /ui/sse/requests/{id}/status` — live request status badge
+- `GET /ui/sse/review/queue-count` — live review queue count for checkers
+- `GET /ui/sse/notifications/count` — live unread notification count
+- Template updates: `data-on-load` attributes on status badges and nav badges
+- Database polling (2s interval, 5min connection timeout)
+- Auth via session cookie on connection open
+
+---
+
+## Iteration 17 — ARQ Cron Jobs: URL Expiry & Stuck Requests
+
+**Goal**: Proactive alerts for expiring pre-signed URLs and stuck requests.
+
+Spec: `spec/iterations/iteration-17-spec.md`
+
+Deliverables:
+- `url_expiry_warning_job` — detect ReleaseRecords with URLs expiring within 48h, notify researcher
+- `stuck_request_alert_job` — detect requests stuck in review > configurable hours, notify admins
+- `expiry_warned_at` field on ReleaseRecord (Alembic migration)
+- `request.stuck` notification event type
+- Idempotent — `expiry_warned_at` prevents duplicate warnings
+- Settings: `url_expiry_warning_hours`
+
+---
+
+## Iteration 18 — File Preview Rendering
+
+**Goal**: Server-side file preview for CSV, markdown, code, images in the review and detail views.
+
+Spec: `spec/iterations/iteration-18-spec.md`
+
+Deliverables:
+- Preview service (`preview_service.py`) — render file content to HTML
+- CSV/TSV/Parquet via `polars` (first 50 rows)
+- Markdown via `mistune`
+- Code via `pygments` syntax highlighting
+- Images via base64 data URI
+- HTML sanitization via `nh3`
+- Size limit: skip preview for files > 10MB
+- Graceful degradation when S3 unavailable (dev mode)
+- Updated `file_preview.html` template
+
+---
+
+## Iteration 19 — Production Readiness
+
+**Goal**: PostgreSQL migration testing, Helm hardening, CI improvements, operational documentation.
+
+Spec: `spec/iterations/iteration-19-spec.md`
+
+Deliverables:
+- CI job running Alembic migrations + tests against PostgreSQL
+- `values.production.yaml` with production-appropriate Helm defaults
+- Helm lint + template validation in CI
+- Dockerfile scan (trivy) in CI
+- `docs/runbook.md` — deployment, migrations, failure modes, monitoring, scaling
+- `docs/security-checklist.md` — CSRF, rate limiting, auth, secrets, container security
+
+---
+
 ## Later / backlog
 
 - Per-user notification preference settings
@@ -250,3 +374,4 @@ Deliverables:
 - Researcher self-service statbarn lookup / guidance
 - API key support for programmatic submission
 - TRE-specific RO-Crate profile proposal (community contribution)
+- CRD watch mode (real-time sync, complement to periodic reconcile)
