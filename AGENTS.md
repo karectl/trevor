@@ -277,3 +277,13 @@ Keycloak admin: `admin` / `admin` at `http://localhost:8080`.
 - Conventional Commits. Subject ≤50 chars; body only when "why" isn't obvious.
 - Run before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest -v`
 - Do not push unless explicitly asked.
+
+---
+
+## Iteration workflow
+
+Before starting any new iteration:
+
+1. Add an entry to `docs/spec/iteration-plan.md`.
+2. Write a full spec at `docs/spec/iterations/iteration-N-spec.md` covering goal, current state, scope decisions, detailed requirements, test plan, files changed, and implementation order.
+3. **Stop and ask the user to review and approve the spec before writing any code.**
