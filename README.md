@@ -31,7 +31,7 @@ Researchers submit output objects (files, tables, figures) for disclosure review
 
 ```bash
 uv sync
-uv run pytest -v        # 195 tests, no external services needed
+uv run pytest -v        # 220 tests, no external services needed
 uv run trevor           # API on http://localhost:8000
 ```
 
@@ -118,6 +118,9 @@ Key variables (full list in `sample.env`):
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | S3 credentials |
 | `SECRET_KEY` | CSRF / session secret — must be strong in production |
 | `NOTIFICATIONS_ENABLED` | Enable in-app notification system (`true` by default) |
+| `EMAIL_NOTIFICATIONS_ENABLED` | Enable SMTP email notifications (`false` by default) |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server address and port (`localhost:587`) |
+| `TREVOR_BASE_URL` | Base URL used in email links (`http://localhost:8000`) |
 | `AGENT_LLM_ENABLED` | Enable LLM-based agent review (`false` by default) |
 
 ## Helm chart
