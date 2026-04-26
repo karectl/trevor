@@ -385,6 +385,22 @@ Deliverables:
 
 ---
 
+## Iteration 20 — Two-Panel Researcher/Checker UI
+
+**Goal**: Redesign the researcher request detail page and the checker review form into a consistent two-panel layout with inline upload, inline metadata editing, file-type icons, and per-object state dots. Expose the `title` metadata field in all relevant forms and views.
+
+Spec: `spec/iterations/iteration-20-spec.md`
+
+Deliverables:
+- Two-panel researcher detail page: left nav (ft-icon + state dot) + right panel (object detail, inline upload, inline metadata edit, Reviews/Audit tabs)
+- Datastar signals replacing deprecated `data-store` in checker review form
+- `title` field added to metadata POST endpoint, upload form, and checker review metadata display
+- `_build_request_detail_ctx` shared context helper
+- CSS: `ft-icon` file-type palette (tabular/figure/code/report/model/other), `obj-state-dot` state indicators
+- 10 new tests (262 total)
+
+---
+
 ## Later / backlog
 
 - Per-user notification preference settings
