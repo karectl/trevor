@@ -702,13 +702,15 @@ async def _checker_project_ids(
         result = await session.exec(select(Project.id))
         return list(result.all())
     memberships = await session.exec(
-        select(ProjectMembership.project_id).where(
+        select(ProjectMembership.project_id)
+        .where(
             ProjectMembership.user_id == user_id,
             ProjectMembership.role.in_([
                 ProjectRole.OUTPUT_CHECKER,
                 ProjectRole.SENIOR_CHECKER,
             ]),
         )
+        .distinct()
     )
     return list(memberships.all())
 

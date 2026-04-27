@@ -174,6 +174,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         return JSONResponse({"detail": "Internal server error"}, status_code=500)
 
+    @app.get("/", include_in_schema=False)
+    async def root_redirect() -> RedirectResponse:
+        return RedirectResponse("/ui", status_code=302)
+
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
         return {"status": "ok", "version": settings.app_version}

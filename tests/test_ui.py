@@ -305,3 +305,52 @@ async def test_review_project_404(admin_client: AsyncClient) -> None:
 
     r = await admin_client.get(f"/ui/review/project/{uuid.uuid4()}")
     assert r.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_root_redirects_to_ui(client: AsyncClient) -> None:
+    """GET / redirects to /ui."""
+    r = await client.get("/", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "/ui"
+
+
+@pytest.mark.anyio
+async def test_review_queue_no_duplicate_cards(client: AsyncClient, db_session) -> None:
+    """Checker with OUTPUT_CHECKER + SENIOR_CHECKER on same project sees only one card."""
+    from trevor.models.project import Project, ProjectMembership, ProjectRole
+
+    # Upsert the dev-bypass user so they exist in DB
+    me = await client.get("/users/me")
+    assert me.status_code == 200
+    user_id = me.json()["id"]
+
+    # Create a project
+    project = Project(crd_name="dupe-check-proj", display_name="Dupe Check Project")
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+
+    # Assign both OUTPUT_CHECKER and SENIOR_CHECKER to same user on same project
+    import uuid
+
+    m1 = ProjectMembership(
+        user_id=uuid.UUID(user_id),
+        project_id=project.id,
+        role=ProjectRole.OUTPUT_CHECKER,
+        assigned_by=uuid.UUID(user_id),
+    )
+    m2 = ProjectMembership(
+        user_id=uuid.UUID(user_id),
+        project_id=project.id,
+        role=ProjectRole.SENIOR_CHECKER,
+        assigned_by=uuid.UUID(user_id),
+    )
+    db_session.add(m1)
+    db_session.add(m2)
+    await db_session.commit()
+
+    r = await client.get("/ui/review")
+    assert r.status_code == 200
+    # Project name should appear exactly once in the page
+    assert r.text.count("Dupe Check Project") == 1
