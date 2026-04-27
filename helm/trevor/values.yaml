@@ -13,6 +13,9 @@ serviceAccount:
   name: ""
   annotations: {}
 
+rbac:
+  create: true  # creates ClusterRole + ClusterRoleBinding for CRD read access
+
 service:
   type: ClusterIP
   port: 8000
