@@ -1,5 +1,7 @@
 """UI router tests — verify HTML rendering and redirects."""
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -332,8 +334,6 @@ async def test_review_queue_no_duplicate_cards(client: AsyncClient, db_session) 
     await db_session.refresh(project)
 
     # Assign both OUTPUT_CHECKER and SENIOR_CHECKER to same user on same project
-    import uuid
-
     m1 = ProjectMembership(
         user_id=uuid.UUID(user_id),
         project_id=project.id,
@@ -352,5 +352,5 @@ async def test_review_queue_no_duplicate_cards(client: AsyncClient, db_session) 
 
     r = await client.get("/ui/review")
     assert r.status_code == 200
-    # Project name should appear exactly once in the page
-    assert r.text.count("Dupe Check Project") == 1
+    # Exactly one project card rendered (class is unique per card in the template)
+    assert r.text.count("review-project-card") == 1
