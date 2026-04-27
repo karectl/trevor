@@ -1,7 +1,10 @@
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: trevor-crd-reader
+  name: {{ include "trevor.fullname" . }}-crd-reader
+  labels:
+    {{- include "trevor.labels" . | nindent 4 }}
 rules:
   - apiGroups: ["research.karectl.io"]
     resources: ["projects"]
@@ -13,12 +16,15 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: trevor-crd-reader
+  name: {{ include "trevor.fullname" . }}-crd-reader
+  labels:
+    {{- include "trevor.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: trevor-trevor
-    namespace: trevor-dev
+    name: {{ include "trevor.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: trevor-crd-reader
+  name: {{ include "trevor.fullname" . }}-crd-reader
   apiGroup: rbac.authorization.k8s.io
+{{- end }}
